@@ -6,8 +6,7 @@ namespace ConnectionsEducation.Redis.Test {
 		[TestMethod]
 		public void testPing() {
 			Connection connection = new Connection();
-			string actual = connection.ping();
-			Assert.AreEqual("PONG", actual);
+			Assert.IsTrue(connection.ping());
 		}
 
 		[TestMethod]

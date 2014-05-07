@@ -8,7 +8,7 @@ namespace ConnectionsEducation.Redis {
 	public class ConnectionClient {
 		// Credit http://msdn.microsoft.com/en-us/library/bew39x2a(v=vs.100).aspx "Asynchronous Client Socket Example"
 
-		private readonly string _command;
+		private readonly Command _command;
 		private readonly ManualResetEventSlim _connectDone = new ManualResetEventSlim(false);
 		private readonly Encoding _encoding;
 		private readonly string _host;
@@ -17,7 +17,7 @@ namespace ConnectionsEducation.Redis {
 		private readonly ManualResetEventSlim _sendDone = new ManualResetEventSlim(false);
 		private readonly int _timeout;
 
-		public ConnectionClient(string command, string host = "127.0.0.1", int port = 6379, int timeout = 60000, Encoding encoding = null) {
+		public ConnectionClient(Command command, string host = "127.0.0.1", int port = 6379, int timeout = 60000, Encoding encoding = null) {
 			_command = command;
 			_host = host;
 			_port = port;
@@ -46,7 +46,7 @@ namespace ConnectionsEducation.Redis {
 			if (!_connectDone.Wait(_timeout))
 				throw new TimeoutException("Timeout _connectDone");
 
-			send(client, _command);
+			send(client, _command.getBytes());
 
 			if (!_sendDone.Wait(_timeout))
 				throw new TimeoutException("Timeout _sendDone");
@@ -94,9 +94,8 @@ namespace ConnectionsEducation.Redis {
 			return state.update(bytesRead);
 		}
 
-		private void send(Socket client, String data) {
-			byte[] byteData = _encoding.GetBytes(data);
-			client.BeginSend(byteData, 0, byteData.Length, 0, new AsyncCallback(sendCallback), client);
+		private void send(Socket client, byte[] data) {
+			client.BeginSend(data, 0, data.Length, 0, new AsyncCallback(sendCallback), client);
 		}
 
 		private void sendCallback(IAsyncResult result) {

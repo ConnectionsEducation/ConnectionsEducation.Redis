@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectionsEducation.Redis"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConnectionsEducation.Redis.Test", "..\ConnectionsEducation.Redis.Test\ConnectionsEducation.Redis.Test.csproj", "{967D5459-9074-47BE-AE7C-F0C3DB8A0711}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleMemoryTest", "ConsoleMemoryTest\ConsoleMemoryTest.csproj", "{084A0541-DBBF-406D-B9EE-A28E7238643B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{967D5459-9074-47BE-AE7C-F0C3DB8A0711}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{967D5459-9074-47BE-AE7C-F0C3DB8A0711}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{967D5459-9074-47BE-AE7C-F0C3DB8A0711}.Release|Any CPU.Build.0 = Release|Any CPU
+		{084A0541-DBBF-406D-B9EE-A28E7238643B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{084A0541-DBBF-406D-B9EE-A28E7238643B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{084A0541-DBBF-406D-B9EE-A28E7238643B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{084A0541-DBBF-406D-B9EE-A28E7238643B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

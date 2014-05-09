@@ -40,6 +40,7 @@ namespace ConnectionsEducation.Redis.Test {
 				connection.set("foo", "1");
 				connection.set("bar", "2");
 				Assert.AreEqual(2L, connection.del("foo", "bar", "baz"));
+				Assert.IsNull(connection.get("foo"));
 			}
 		}
 

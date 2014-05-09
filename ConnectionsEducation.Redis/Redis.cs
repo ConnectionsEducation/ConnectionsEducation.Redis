@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Text;
 using System.Threading;
 
 namespace ConnectionsEducation.Redis {
-	public partial class Connection : IDisposable {
+	public partial class Redis : IDisposable {
 
 		private readonly ConnectionClient _client;
 		private readonly ConcurrentQueue<AwaitResult> _results = new ConcurrentQueue<AwaitResult>();
@@ -24,8 +25,8 @@ namespace ConnectionsEducation.Redis {
 			public object result { get; set; }
 		}
 
-		public Connection() {
-			_client = new ConnectionClient();
+		public Redis(string host = "127.0.0.1", int port = 6379, int connectTimeout = 1000, Encoding encoding = null) {
+			_client = new ConnectionClient(host, port, connectTimeout, encoding);
 			_client.objectReceived += _client_objectReceived;
 			_client.connectionError += _client_connectionError;
 			_client.connect();

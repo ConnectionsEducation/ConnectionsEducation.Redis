@@ -41,8 +41,8 @@
   <ItemGroup>
     <Compile Include="ByteArrayExtensions.cs" />
     <Compile Include="Command.cs" />
-    <Compile Include="Connection.Commands.cs" />
-    <Compile Include="Connection.cs" />
+    <Compile Include="Redis.Commands.cs" />
+    <Compile Include="Redis.cs" />
     <Compile Include="ConnectionClient.cs" />
     <Compile Include="ConnectionState.cs" />
     <Compile Include="ObjectReceievedEventArgs.cs" />

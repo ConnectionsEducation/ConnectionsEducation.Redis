@@ -56,7 +56,7 @@
     <Compile Include="ByteArrayExtensionsTest.cs" />
     <Compile Include="ConnectionClientTest.cs" />
     <Compile Include="ConnectionStateTest.cs" />
-    <Compile Include="ConnectionTest.cs" />
+    <Compile Include="RedisTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

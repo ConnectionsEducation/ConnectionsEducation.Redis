@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 
 namespace ConnectionsEducation.Redis {
-	public partial class Connection {
+	public partial class Redis {
 
 		public bool ping() {
 			Command command = Command.fromString("PING\r\n");

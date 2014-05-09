@@ -12,7 +12,7 @@ namespace ConsoleMemoryTest {
 			stopwatch.Start();
 			for (int iter = 1; iter <= ITERS; ++iter) {
 				int success = 0;
-				using (ConnectionsEducation.Redis.Connection conn = new ConnectionsEducation.Redis.Connection()) {
+				using (ConnectionsEducation.Redis.Redis conn = new ConnectionsEducation.Redis.Redis()) {
 					for (int i = 0; i < BATCH; ++i) {
 						string guid = Guid.NewGuid().ToString("d");
 						conn.set("foo" + i, guid);

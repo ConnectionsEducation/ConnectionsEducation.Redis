@@ -41,5 +41,20 @@ namespace ConnectionsEducation.Redis.Test {
 				Assert.AreEqual(2L, connection.del("foo", "bar", "baz"));
 			}
 		}
+
+		[TestMethod]
+		public void testIncr() {
+			using (Connection connection = new Connection()) {
+				connection.set("foo", "0");
+				connection.set("food", "0");
+				connection.set("bar", "0");
+				connection.incr("foo");
+				connection.incr("foo");
+				connection.incr("foo");
+				connection.incr("bar");
+				connection.incr("food");
+				Assert.AreEqual(4L, connection.incr("foo"));
+			}
+		}
 	}
 }

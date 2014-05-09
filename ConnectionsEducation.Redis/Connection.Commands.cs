@@ -27,5 +27,11 @@ namespace ConnectionsEducation.Redis {
 			long value = resultToNumber(sendCommand(command));
 			return value;
 		}
+
+		public long incr(string key) {
+			Command command = new Command("INCR", key);
+			long value = resultToNumber(sendCommand(command));
+			return value;
+		}
 	}
 }

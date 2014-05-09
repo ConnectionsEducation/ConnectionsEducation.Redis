@@ -41,6 +41,32 @@ namespace ConnectionsEducation.Redis.Test {
 			assertString(EXPECTED, _receivedData.Dequeue());
 		}
 
+		[TestMethod]
+		public void bulkStringNull_addsNull() {
+			byte[] protocolData = _state.encoding.GetBytes("$-1\r\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+
+			_state.update(protocolData.Length);
+
+			Queue data = (Queue)_receivedData.Dequeue();
+			Assert.AreEqual(1, data.Count);
+			Assert.IsNull(data.Dequeue());
+		}
+
+		[TestMethod]
+		public void integerAsOnlyBuffer_addsInt() {
+			byte[] protocolData = _state.encoding.GetBytes(":123\r\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+
+			_state.update(protocolData.Length);
+
+			Queue data = (Queue)_receivedData.Dequeue();
+			Assert.AreEqual(1, data.Count);
+			object value = data.Dequeue();
+			Assert.IsTrue(value is long, "Data is not an integer");
+			Assert.AreEqual(123L, (long)value);
+		}
+
 		private void assertString(string expected, object receivedValue) {
 			Queue data = (Queue)receivedValue;
 			Assert.IsNotNull(data);

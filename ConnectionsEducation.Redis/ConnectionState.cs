@@ -62,6 +62,11 @@ namespace ConnectionsEducation.Redis {
 							operations.Push(new AwaitSimpleString());
 							++bufferIndex;
 							continue;
+						case COLON:
+							operations.Pop();
+							operations.Push(new AwaitInt());
+							++bufferIndex;
+							continue;
 						default:
 							throw new NotImplementedException("Operation not implemented for " + encoding.GetString(buffer, bufferIndex, 1));
 					}
@@ -76,6 +81,23 @@ namespace ConnectionsEducation.Redis {
 						string value = _encoding.GetString(stringData);
 						operations.Pop();
 						apply(value);
+						bufferIndex = indexCrLf + CrLf.Length;
+					}
+				} else if (nextOp is AwaitInt) {
+					int indexCrLf = buffer.indexOf(CrLf, bufferIndex);
+					AwaitInt op = (AwaitInt)nextOp;
+					if (indexCrLf == -1) {
+						op.data = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex)).ToArray();
+						bufferIndex = buffer.Length;
+					} else {
+						byte[] stringData = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex).Take(indexCrLf - bufferIndex)).ToArray();
+						string valueLiteral = _encoding.GetString(stringData);
+						operations.Pop();
+						long value;
+						if (long.TryParse(valueLiteral, out value))
+							apply(value);
+						else
+							apply(new Exception(string.Format("Failed to parse {0} as an integer", valueLiteral)));
 						bufferIndex = indexCrLf + CrLf.Length;
 					}
 				} else if (nextOp is AwaitString) {
@@ -151,11 +173,31 @@ namespace ConnectionsEducation.Redis {
 				op.readSize = true;
 				op.size = size;
 				op.data = new byte[] {};
+				if (op.size < 0) {
+					operations.Pop();
+					apply((string)null);
+				}
 			} else
 				receivedData.Enqueue(value);
 		}
 
+		private void apply(long value) {
+			if (operations.Count == 0) {
+				receivedData.Enqueue(value);
+			}
+		}
+
+		private void apply(Exception error) {
+			if (operations.Count == 0) {
+				receivedData.Enqueue(error);
+			}
+		}
+
 		private class AwaitSimpleString {
+			public byte[] data { get; set; }
+		}
+
+		private class AwaitInt {
 			public byte[] data { get; set; }
 		}
 

@@ -14,26 +14,23 @@ namespace ConnectionsEducation.Redis {
 			_bytes = bytes;
 		}
 
-		public Command(Encoding encoding, params string[] args) : this(encoding, args as ICollection<string>) {
+		public Command(Encoding encoding, string command, params string[] args) : this(encoding, command, args, args.Length + 1) {
 			
 		}
 
-		public Command(params string[] args) : this(args as ICollection<string>) {
+		public Command(string command, params string[] args) : this(Encoding.ASCII, command, args, args.Length + 1) {
 			
 		}
 
-		public Command(ICollection<string> commandArgs) : this(Encoding.ASCII, commandArgs) {
-			
-		}
-
-		private Command(Encoding encoding, ICollection<string> commandArgs) {
-			IEnumerable<byte> commands = commandArgs.Select(command => {
-				byte[] bytes = encoding.GetBytes(command);
+		private Command(Encoding encoding, string command1, IEnumerable<string> commandArgs, int count) {
+			string[] command = command1 == null ? new string[] {} : new string[] {command1};
+			IEnumerable<byte> commands = command.Concat(commandArgs).Select(arg => {
+				byte[] bytes = encoding.GetBytes(arg);
 				return Encoding.ASCII.GetBytes(string.Format("${0}\r\n", bytes.Length))
 					.Concat(bytes)
 					.Concat(Encoding.ASCII.GetBytes("\r\n"));
 			}).Aggregate(Enumerable.Empty<byte>(), (all, bytes) => all.Concat(bytes));
-			_bytes = Encoding.ASCII.GetBytes(string.Format("*{0}\r\n", commandArgs.Count))
+			_bytes = Encoding.ASCII.GetBytes(string.Format("*{0}\r\n", count))
 				.Concat(commands).ToArray();
 		}
 

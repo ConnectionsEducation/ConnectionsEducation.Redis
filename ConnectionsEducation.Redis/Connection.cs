@@ -4,7 +4,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 
 namespace ConnectionsEducation.Redis {
-	public class Connection : IDisposable {
+	public partial class Connection : IDisposable {
 
 		private readonly ConnectionClient _client;
 		private readonly ConcurrentQueue<AwaitResult> _results = new ConcurrentQueue<AwaitResult>();
@@ -50,25 +50,6 @@ namespace ConnectionsEducation.Redis {
 			_resultConsumed.Reset();
 		}
 
-		public bool ping() {
-			Command command = Command.fromString("PING\r\n");
-			string pong = resultToString(sendCommand(command));
-			return pong == "PONG";
-		}
-
-		public void set(string key, string value) {
-			Command command = new Command("SET", key, value);
-			string ok = resultToString(sendCommand(command));
-			if (ok != "OK")
-				throw new InvalidOperationException("Set result is not OK!");
-		}
-
-		public string get(string key) {
-			Command command = new Command("GET", key);
-			string value = resultToString(sendCommand(command));
-			return value;
-		}
-
 		private Queue sendCommand(Command command) {
 			ManualResetEventSlim waiter = new ManualResetEventSlim(false);
 			AwaitResult awaitResult = new AwaitResult(waiter);
@@ -87,12 +68,14 @@ namespace ConnectionsEducation.Redis {
 		}
 
 		private static string resultToString(Queue result) {
-			if (result == null || result.Count == 0)
-				return null;
 			object data = result.Dequeue();
 			if (data == null)
 				return null;
 			return data.ToString();
+		}
+		private static long resultToNumber(Queue result) {
+			object data = result.Dequeue();
+			return Convert.ToInt64(data);
 		}
 
 		#region Disposable

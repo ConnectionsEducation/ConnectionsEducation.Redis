@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="ByteArrayExtensions.cs" />
     <Compile Include="Command.cs" />
+    <Compile Include="Connection.Commands.cs" />
     <Compile Include="Connection.cs" />
     <Compile Include="ConnectionClient.cs" />
     <Compile Include="ConnectionState.cs" />

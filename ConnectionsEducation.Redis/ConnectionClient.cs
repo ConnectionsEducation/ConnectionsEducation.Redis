@@ -29,7 +29,6 @@ namespace ConnectionsEducation.Redis {
 			_cancel = new CancellationTokenSource();
 
 			_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-			_client.UseOnlyOverlappedIO = true;
 		}
 
 		public void connect() {
@@ -41,8 +40,11 @@ namespace ConnectionsEducation.Redis {
 			}
 
 			if (connect) {
-				IPHostEntry ipHostInfo = Dns.GetHostEntry(_host);
-				IPAddress ipAddress = ipHostInfo.AddressList[0];
+				IPAddress ipAddress;
+				if (!IPAddress.TryParse(_host, out ipAddress)) {
+					IPHostEntry ipHostInfo = Dns.GetHostEntry(_host);
+					ipAddress = ipHostInfo.AddressList[0];
+				}
 				IPEndPoint endPoint = new IPEndPoint(ipAddress, _port);
 				_client.BeginConnect(endPoint, new AsyncCallback(connect_then), _client);
 			} else {

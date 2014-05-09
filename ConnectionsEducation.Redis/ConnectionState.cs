@@ -67,8 +67,43 @@ namespace ConnectionsEducation.Redis {
 							operations.Push(new AwaitInt());
 							++bufferIndex;
 							continue;
+						case ASTERISK:
+							operations.Pop();
+							operations.Push(new AwaitList {readLength = false});
+							operations.Push(new AwaitSimpleString());
+							++bufferIndex;
+							continue;
 						default:
 							throw new NotImplementedException("Operation not implemented for " + encoding.GetString(buffer, bufferIndex, 1));
+					}
+				} else if (nextOp is AwaitCrLf) {
+					AwaitCrLf op = (AwaitCrLf)nextOp;
+					int availableLength = buffer.Length - bufferIndex;
+					if (availableLength < 1)
+						continue;
+					if (!op.cr) {
+						if (availableLength >= 2) {
+							if (buffer[bufferIndex] == CR && buffer[bufferIndex + 1] == LF) {
+								operations.Pop();
+								bufferIndex += 2;
+							} else {
+								throw new InvalidOperationException("Protocol Violation. Expected CR-LF.");
+							}
+						} else {
+							if (buffer[bufferIndex] == CR) {
+								op.cr = true;
+								++bufferIndex;
+							} else {
+								throw new InvalidOperationException("Protocol Violation. Expected CR.");
+							}
+						}
+					} else {
+						if (buffer[bufferIndex] == LF) {
+							operations.Pop();
+							++bufferIndex;
+						} else {
+							throw new InvalidOperationException("Protocol Violation. Expected LF.");
+						}
 					}
 				} else if (nextOp is AwaitSimpleString) {
 					int indexCrLf = buffer.indexOf(CrLf, bufferIndex);
@@ -109,46 +144,29 @@ namespace ConnectionsEducation.Redis {
 						byte[] stringData = op.data.Concat(buffer.Skip(bufferIndex).Take(count)).ToArray();
 						string value = _encoding.GetString(stringData);
 						operations.Pop();
-						operations.Push(new AwaitCrLf());
 						apply(value);
 						bufferIndex = bufferIndex + count;
+						operations.Push(new AwaitCrLf());
+						continue;
 					} else {
 						op.data = op.data.Concat(buffer.Skip(bufferIndex).Take(availableLength)).ToArray();
 						bufferIndex = bufferIndex + availableLength;
 					}
-				} else if (nextOp is AwaitCrLf) {
-					AwaitCrLf op = (AwaitCrLf)nextOp;
-					int availableLength = buffer.Length - bufferIndex;
-					if (availableLength < 1)
-						continue;
-					if (!op.cr) {
-						if (availableLength >= 2) {
-							if (buffer[bufferIndex] == CR && buffer[bufferIndex + 1] == LF) {
-								operations.Pop();
-								bufferIndex += 2;
-							} else {
-								throw new InvalidOperationException("Protocol Violation. Expected CR-LF.");
-							}
-						} else {
-							if (buffer[bufferIndex] == CR) {
-								op.cr = true;
-								++bufferIndex;
-							} else {
-								throw new InvalidOperationException("Protocol Violation. Expected CR.");
-							}
-						}
-					} else {
-						if (buffer[bufferIndex] == LF) {
-							operations.Pop();
-							++bufferIndex;
-						} else {
-							throw new InvalidOperationException("Protocol Violation. Expected LF.");
-						}
-					}
+				} else if (nextOp is AwaitList) {
+					AwaitList op = (AwaitList)nextOp;
+					if (op.objectsRead < op.length)
+						operations.Push(new AwaitCommand());
 				} else {
 					throw new NotImplementedException("Don't know what to do.");
 				}
 
+
+				nextOp = operations.Count > 0 ? operations.Peek() : null;
+				while (nextOp is AwaitList && ((AwaitList)nextOp).objectsRead >= ((AwaitList)nextOp).length) {
+					operations.Pop();
+					apply(((AwaitList)nextOp).data);
+					nextOp = operations.Count > 0 ? operations.Peek() : null;
+				}
 
 				if (operations.Count == 0) {
 					// Opportunity here to convert from "internal" state to "external" state.
@@ -158,6 +176,11 @@ namespace ConnectionsEducation.Redis {
 					onObjectReceived(new ObjectReceievedEventArgs(receivedObject));
 				}
 			}
+		}
+
+		private void apply(object[] value) {
+			if (operations.Count == 0 || !applyToList(value))
+				receivedData.Enqueue(value);
 		}
 
 		private void apply(string value) {
@@ -177,18 +200,45 @@ namespace ConnectionsEducation.Redis {
 					operations.Pop();
 					apply((string)null);
 				}
-			} else
-				receivedData.Enqueue(value);
+			} else if (nextOp is AwaitList && !((AwaitList)nextOp).readLength) {
+				AwaitList op = (AwaitList)nextOp;
+				int length = Convert.ToInt32(value);
+				op.readLength = true;
+				op.length = length;
+				if (op.length < 0) {
+					operations.Pop();
+					apply((string)null);
+				}
+				op.data = new object[length];
+			} else {
+				if (!applyToList(value)) {
+					receivedData.Enqueue(value);
+					operations.Push(new AwaitCrLf());
+				}
+			}
+		}
+
+		private bool applyToList(object value) {
+			object nextOp = operations.Peek();
+			if (!(nextOp is AwaitList))
+				return false;
+			AwaitList op = (AwaitList)nextOp;
+			if (op.objectsRead >= op.length) {
+				return false;
+			} else {
+				op.data[op.objectsRead++] = value;
+				return true;
+			}
 		}
 
 		private void apply(long value) {
-			if (operations.Count == 0) {
+			if (operations.Count == 0 || !applyToList(value)) {
 				receivedData.Enqueue(value);
 			}
 		}
 
 		private void apply(Exception error) {
-			if (operations.Count == 0) {
+			if (operations.Count == 0 || !applyToList(error)) {
 				receivedData.Enqueue(error);
 			}
 		}
@@ -205,6 +255,13 @@ namespace ConnectionsEducation.Redis {
 			public bool readSize { get; set; }
 			public int size { get; set; }
 			public byte[] data { get; set; }
+		}
+
+		private class AwaitList {
+			public bool readLength { get; set; }
+			public int length { get; set; }
+			public int objectsRead { get; set; }
+			public object[] data { get; set; }
 		}
 
 		private class AwaitCommand {

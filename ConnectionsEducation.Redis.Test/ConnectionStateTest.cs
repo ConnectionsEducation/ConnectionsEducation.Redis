@@ -67,6 +67,46 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.AreEqual(123L, (long)value);
 		}
 
+		[TestMethod]
+		public void simpleList() {
+			byte[] protocolData = _state.encoding.GetBytes("*3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$3\r\nbaz\r\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+
+			_state.update(protocolData.Length);
+
+			Queue data = (Queue)_receivedData.Dequeue();
+			Assert.AreEqual(1, data.Count);
+			object value = data.Dequeue();
+			Assert.IsTrue(value is object[], "Data is not a list");
+			object[] list = (object[])value;
+			Assert.AreEqual(3, list.Length, "Data has wrong length");
+			Assert.AreEqual("foo", list[0]);
+			Assert.AreEqual("bar", list[1]);
+			Assert.AreEqual("baz", list[2]);
+		}
+
+		[TestMethod]
+		public void simpleListWithinList() {
+			byte[] protocolData = _state.encoding.GetBytes("*3\r\n$3\r\nfoo\r\n*2\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n$3\r\nbaz\r\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+
+			_state.update(protocolData.Length);
+
+			Queue data = (Queue)_receivedData.Dequeue();
+			Assert.AreEqual(1, data.Count);
+			object value = data.Dequeue();
+			Assert.IsTrue(value is object[], "Data is not a list");
+			object[] list = (object[])value;
+			Assert.AreEqual(3, list.Length, "Data has wrong length");
+			Assert.AreEqual("foo", list[0]);
+			object[] listInList = list[1] as object[];
+			Assert.IsNotNull(listInList);
+			Assert.AreEqual(2, listInList.Length);
+			Assert.AreEqual("bar1", listInList[0]);
+			Assert.AreEqual("bar2", listInList[1]);
+			Assert.AreEqual("baz", list[2]);
+		}
+
 		private void assertString(string expected, object receivedValue) {
 			Queue data = (Queue)receivedValue;
 			Assert.IsNotNull(data);

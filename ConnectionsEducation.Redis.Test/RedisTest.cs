@@ -123,5 +123,15 @@ namespace ConnectionsEducation.Redis.Test {
 				Assert.IsNull(value);
 			}
 		}
+
+		[TestMethod]
+		public void testExpire() {
+			using (Redis redis = new Redis()) {
+				redis.del("foo", "bar");
+				redis.set("foo", "bar");
+				Assert.IsTrue(redis.expire("foo", 10));
+				Assert.IsFalse(redis.expire("bar", 10));
+			}
+		}
 	}
 }

@@ -37,6 +37,12 @@ namespace ConnectionsEducation.Redis {
 			return value;
 		}
 
+		public bool expire(string key, int seconds) {
+			Command command = new Command("EXPIRE", key, seconds.ToString(CultureInfo.InvariantCulture));
+			bool success = resultToNumber(sendCommand(command)) > 0;
+			return success;
+		}
+
 		public long zadd(string setKey, params Tuple<long, string>[] elements) {
 			List<string> args = new List<string>();
 			args.Add(setKey);

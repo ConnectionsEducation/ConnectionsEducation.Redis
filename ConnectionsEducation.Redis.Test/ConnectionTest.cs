@@ -5,16 +5,18 @@ namespace ConnectionsEducation.Redis.Test {
 	public class ConnectionTest {
 		[TestMethod]
 		public void testPing() {
-			Connection connection = new Connection();
-			Assert.IsTrue(connection.ping());
+			using (Connection connection = new Connection()) {
+				Assert.IsTrue(connection.ping());
+			}
 		}
 
 		[TestMethod]
 		public void testSetGetString() {
-			Connection connection = new Connection();
-			connection.set("foo", "bar");
-			string actual = connection.get("foo");
-			Assert.AreEqual("bar", actual);
+			using (Connection connection = new Connection()) {
+				connection.set("foo", "bar");
+				string actual = connection.get("foo");
+				Assert.AreEqual("bar", actual);
+			}
 		}
 
 		[TestMethod]
@@ -24,10 +26,11 @@ namespace ConnectionsEducation.Redis.Test {
 				expected += ".";
 			}
 			expected += "XXX";
-			Connection connection = new Connection();
-			connection.set("foo", expected);
-			string actual = connection.get("foo");
-			Assert.AreEqual(expected, actual);
+			using (Connection connection = new Connection()) {
+				connection.set("foo", expected);
+				string actual = connection.get("foo");
+				Assert.AreEqual(expected, actual);
+			}
 		}
 	}
 }

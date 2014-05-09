@@ -1,28 +1,67 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
 namespace ConnectionsEducation.Redis {
-	public class ConnectionClient {
+	public class ConnectionClient : IDisposable {
 		// Credit http://msdn.microsoft.com/en-us/library/bew39x2a(v=vs.100).aspx "Asynchronous Client Socket Example"
 
-		private readonly Command _command;
-		private readonly ManualResetEventSlim _connectDone = new ManualResetEventSlim(false);
 		private readonly Encoding _encoding;
 		private readonly string _host;
 		private readonly int _port;
-		private readonly ManualResetEventSlim _receiveDone = new ManualResetEventSlim(false);
-		private readonly ManualResetEventSlim _sendDone = new ManualResetEventSlim(false);
-		private readonly int _timeout;
+		private readonly ManualResetEventSlim _connectDone = new ManualResetEventSlim(false);
+		private readonly int _connectTimeout;
+		private readonly ConcurrentQueue<Command> _commands;
+		private readonly CancellationTokenSource _cancel;
+		private readonly Socket _client;
 
-		public ConnectionClient(Command command, string host = "127.0.0.1", int port = 6379, int timeout = 60000, Encoding encoding = null) {
-			_command = command;
+		private bool _connected;
+
+		public ConnectionClient(string host = "127.0.0.1", int port = 6379, int connectTimeout = 1000, Encoding encoding = null) {
 			_host = host;
 			_port = port;
-			_timeout = timeout;
+			_connectTimeout = connectTimeout;
 			_encoding = encoding ?? Encoding.ASCII;
+			_commands = new ConcurrentQueue<Command>();
+			_cancel = new CancellationTokenSource();
+
+			_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			_client.UseOnlyOverlappedIO = true;
+		}
+
+		public void connect() {
+			bool connect = false;
+
+			if (!_connected) {
+				_connected = true;
+				connect = true;
+			}
+
+			if (connect) {
+				IPHostEntry ipHostInfo = Dns.GetHostEntry(_host);
+				IPAddress ipAddress = ipHostInfo.AddressList[0];
+				IPEndPoint endPoint = new IPEndPoint(ipAddress, _port);
+				_client.BeginConnect(endPoint, new AsyncCallback(connect_then), _client);
+			} else {
+				if (!_connectDone.Wait(_connectTimeout))
+					throw new TimeoutException("_connectDone");
+			}
+		}
+
+		private void connect_then(IAsyncResult result) {
+			Socket client = (Socket)result.AsyncState;
+			try {
+				client.EndConnect(result);
+			} catch {
+				onConnectionError();
+				return;
+			}
+			_connectDone.Set();
+			recvData(client);
+			sendData(client);
 		}
 
 		public Encoding encoding {
@@ -30,6 +69,13 @@ namespace ConnectionsEducation.Redis {
 		}
 
 		public event EventHandler<ObjectReceievedEventArgs> objectReceived;
+		public event EventHandler connectionError;
+
+		protected virtual void onConnectionError() {
+			EventHandler handler = connectionError;
+			if (handler != null)
+				handler(this, EventArgs.Empty);
+		}
 
 		protected virtual void onObjectReceived(ObjectReceievedEventArgs e) {
 			EventHandler<ObjectReceievedEventArgs> handler = objectReceived;
@@ -37,71 +83,123 @@ namespace ConnectionsEducation.Redis {
 				handler(this, e);
 		}
 
-		public void initiate() {
-			IPHostEntry ipHostInfo = Dns.GetHostEntry(_host);
-			IPAddress ipAddress = ipHostInfo.AddressList[0];
-			IPEndPoint endPoint = new IPEndPoint(ipAddress, _port);
-			Socket client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-			client.BeginConnect(endPoint, new AsyncCallback(connectCallback), client);
-			if (!_connectDone.Wait(_timeout))
-				throw new TimeoutException("Timeout _connectDone");
-
-			send(client, _command.getBytes());
-
-			if (!_sendDone.Wait(_timeout))
-				throw new TimeoutException("Timeout _sendDone");
-			receive(client);
-			if (!_receiveDone.Wait(_timeout))
-				throw new TimeoutException("Timeout _receiveDone");
-
-			client.Shutdown(SocketShutdown.Both);
-			client.Close();
+		public void send(Command command) {
+			_commands.Enqueue(command);
 		}
 
-		private void connectCallback(IAsyncResult result) {
-			Socket client = (Socket)result.AsyncState;
-			client.EndConnect(result);
-			_connectDone.Set();
+		protected virtual void close() {
+			_client.Close();
 		}
 
-		private void receive(Socket client) {
+		private void recvData(Socket client) {
+			if (!_connectDone.Wait(_connectTimeout))
+				onConnectionError();
 			ConnectionState state = new ConnectionState(_encoding);
 			state.workSocket = client;
-			client.BeginReceive(state.buffer, 0, ConnectionState.BUFFER_SIZE, 0, new AsyncCallback(receiveCallback), state);
+			try {
+				client.BeginReceive(state.buffer, 0, ConnectionState.BUFFER_SIZE, 0, new AsyncCallback(recvData_then), state);
+			} catch (ObjectDisposedException) {}
 		}
 
-		private void receiveCallback(IAsyncResult result) {
+		private void recvData_then(IAsyncResult result) {
+			if (_disposed || _cancel.IsCancellationRequested)
+				onConnectionError();
 			ConnectionState state = (ConnectionState)result.AsyncState;
 			Socket client = state.workSocket;
-
-			// Read data from the remote device.
-			int bytesRead = client.EndReceive(result);
-			bool done = false;
+			EventHandler<ObjectReceievedEventArgs> handler = new EventHandler<ObjectReceievedEventArgs>(objectReceived);
+			int bytesRead;
+			state.objectReceived += handler;
+			try {
+				bytesRead = client.EndReceive(result);
+			} catch (ObjectDisposedException) {
+				bytesRead = 0;
+			}
 
 			if (bytesRead > 0)
-				done = updateState(state, bytesRead);
+				updateState(state, bytesRead);
+			state.objectReceived -= handler;
 
-			if (!done)
-				client.BeginReceive(state.buffer, 0, ConnectionState.BUFFER_SIZE, 0, new AsyncCallback(receiveCallback), state);
-			else {
-				onObjectReceived(new ObjectReceievedEventArgs(state.receivedData));
-				// Signal that all bytes have been received.
-				_receiveDone.Set();
+			if (!_disposed && !_cancel.IsCancellationRequested) {
+				try {
+					client.BeginReceive(state.buffer, 0, ConnectionState.BUFFER_SIZE, 0, new AsyncCallback(recvData_then), state);
+				} catch (ObjectDisposedException) {}
 			}
 		}
 
-		private static bool updateState(ConnectionState state, int bytesRead) {
-			return state.update(bytesRead);
+		private static void updateState(ConnectionState state, int bytesRead) {
+			state.update(bytesRead);
 		}
 
-		private void send(Socket client, byte[] data) {
-			client.BeginSend(data, 0, data.Length, 0, new AsyncCallback(sendCallback), client);
+		private static byte[] nextData(Tuple<Socket, ConcurrentQueue<Command>> sendCommands) {
+			Command nextCommand;
+			if (!sendCommands.Item2.TryDequeue(out nextCommand))
+				return new byte[0];
+			else
+				return nextCommand.getBytes();
 		}
 
-		private void sendCallback(IAsyncResult result) {
-			Socket client = (Socket)result.AsyncState;
-			client.EndSend(result);
-			_sendDone.Set();
+		private void sendData(Socket client) {
+			if (!_connectDone.Wait(_connectTimeout))
+				onConnectionError();
+			Tuple<Socket,ConcurrentQueue<Command>> sendCommands = new Tuple<Socket,ConcurrentQueue<Command>>(client, _commands);
+			byte[] data = nextData(sendCommands);
+			if (data.Length == 0)
+				Thread.Sleep(0);
+			if (!_disposed && !_cancel.IsCancellationRequested) {
+				try {
+					client.BeginSend(data, 0, data.Length, 0, new AsyncCallback(sendData_then), sendCommands);
+				} catch (ObjectDisposedException) {}
+			}
 		}
+
+		private void sendData_then(IAsyncResult result) {
+			if (_disposed || _cancel.IsCancellationRequested)
+				return;
+			Tuple<Socket, ConcurrentQueue<Command>> sendCommands = (Tuple<Socket, ConcurrentQueue<Command>>)result.AsyncState;
+			Socket client = sendCommands.Item1;
+			byte[] data;
+			try {
+				client.EndSend(result);
+				data = nextData(sendCommands);
+			} catch (ObjectDisposedException) {
+				data = new byte[0];
+			}
+
+			if (data.Length == 0)
+				Thread.Sleep(0);
+			if (!_disposed && !_cancel.IsCancellationRequested) {
+				try {
+					client.BeginSend(data, 0, data.Length, 0, new AsyncCallback(sendData_then), sendCommands);
+				} catch (ObjectDisposedException) { }
+			}
+		}
+
+		#region Disposable
+
+		public void Dispose() {
+			Dispose(true);
+			GC.SuppressFinalize(this);
+		}
+
+		private bool _disposed;
+
+		// ReSharper disable once InconsistentNaming
+		protected virtual void Dispose(bool disposing) {
+			if (_disposed)
+				return;
+
+			if (disposing) {
+				_cancel.Cancel();
+
+				close();
+				_client.Dispose();
+				_cancel.Dispose();
+			}
+
+			_disposed = true;
+		}
+
+		#endregion
+
 	}
 }

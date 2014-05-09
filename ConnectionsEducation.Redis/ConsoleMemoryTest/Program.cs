@@ -12,13 +12,14 @@ namespace ConsoleMemoryTest {
 			stopwatch.Start();
 			for (int iter = 1; iter <= ITERS; ++iter) {
 				int success = 0;
-				for (int i = 0; i < BATCH; ++i) {
-					string guid = Guid.NewGuid().ToString("d");
-					var conn = new ConnectionsEducation.Redis.Connection();
-					conn.set("foo" + i, guid);
-					string value = conn.get("foo" + i);
-					if (guid == value)
-						success++;
+				using (ConnectionsEducation.Redis.Connection conn = new ConnectionsEducation.Redis.Connection()) {
+					for (int i = 0; i < BATCH; ++i) {
+						string guid = Guid.NewGuid().ToString("d");
+						conn.set("foo" + i, guid);
+						string value = conn.get("foo" + i);
+						if (guid == value)
+							success++;
+					}
 				}
 
 				Console.Write("[{0:mm\\:ss\\.f}]", stopwatch.Elapsed);

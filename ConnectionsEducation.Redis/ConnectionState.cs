@@ -24,6 +24,14 @@ namespace ConnectionsEducation.Redis {
 		public Stack operations = new Stack();
 		public Socket workSocket = null;
 
+		public event EventHandler<ObjectReceievedEventArgs> objectReceived;
+
+		protected virtual void onObjectReceived(ObjectReceievedEventArgs e) {
+			EventHandler<ObjectReceievedEventArgs> handler = objectReceived;
+			if (handler != null)
+				handler(this, e);
+		}
+
 		public ConnectionState() : this(Encoding.ASCII) {}
 
 		public ConnectionState(Encoding encoding) {
@@ -34,10 +42,10 @@ namespace ConnectionsEducation.Redis {
 			get { return _encoding; }
 		}
 
-		public bool update(int bytesRead) {
+		public void update(int bytesRead) {
 			int bufferIndex = 0;
 
-			while (bufferIndex < buffer.Length) {
+			while (bufferIndex < buffer.Length && bufferIndex < bytesRead) {
 				if (operations.Count == 0)
 					operations.Push(new AwaitCommand());
 				object nextOp = operations.Peek();
@@ -120,11 +128,14 @@ namespace ConnectionsEducation.Redis {
 				}
 
 
-				if (operations.Count == 0)
-					return true;
+				if (operations.Count == 0) {
+					// Opportunity here to convert from "internal" state to "external" state.
+					Queue receivedObject = new Queue(receivedData.Count);
+					while (receivedData.Count > 0)
+						receivedObject.Enqueue(receivedData.Dequeue());
+					onObjectReceived(new ObjectReceievedEventArgs(receivedObject));
+				}
 			}
-
-			return false;
 		}
 
 		private void apply(string value) {

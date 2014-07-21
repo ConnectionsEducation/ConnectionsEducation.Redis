@@ -2,7 +2,14 @@
 using System.Diagnostics;
 
 namespace ConsoleMemoryTest {
+	/// <summary>
+	/// Runs a series of GET/SET operations against a connected Redis server.
+	/// </summary>
 	class Program {
+		/// <summary>
+		/// Defines the entry point of the application.
+		/// </summary>
+		/// <param name="args">The arguments.</param>
 		static void Main(string[] args) {
 			Stopwatch stopwatch = new Stopwatch();
 			const int ITERS = 100;

@@ -5,43 +5,122 @@ using System.Net.Sockets;
 using System.Text;
 
 namespace ConnectionsEducation.Redis {
+	/// <summary>
+	/// Connection state object. Does the heavy-lifting for the Redis protocol by implementing a state machine.
+	/// </summary>
 	public class ConnectionState {
+		/// <summary>
+		/// The plus as a byte representation in ASCII
+		/// </summary>
 		private const byte PLUS = 43;
+		/// <summary>
+		/// The colon as a byte representation in ASCII
+		/// </summary>
 		private const byte COLON = 58;
+		/// <summary>
+		/// The asterisk as a byte representation in ASCII
+		/// </summary>
 		private const byte ASTERISK = 42;
+		/// <summary>
+		/// The dollar as a byte representation in ASCII
+		/// </summary>
 		private const byte DOLLAR = 36;
+		/// <summary>
+		/// The minus as a byte representation in ASCII
+		/// </summary>
 		private const byte MINUS = 45;
+		/// <summary>
+		/// The carriage return as a byte representation in ASCII
+		/// </summary>
 		private const byte CR = 13;
+		/// <summary>
+		/// The line-feed as a byte representation in ASCII
+		/// </summary>
 		private const byte LF = 10;
 
+		/// <summary>
+		/// The buffer size
+		/// </summary>
 		public const int BUFFER_SIZE = 1000;
 
+		/// <summary>
+		/// The encoding
+		/// </summary>
 		private readonly Encoding _encoding;
+		/// <summary>
+		/// CR-LF as a byte array
+		/// </summary>
 		private static readonly byte[] CrLf = {CR, LF};
 
+		/// <summary>
+		/// The buffer
+		/// </summary>
 		public byte[] buffer = new byte[BUFFER_SIZE];
+		/// <summary>
+		/// The received data queue
+		/// </summary>
 		public Queue receivedData = new Queue();
+		/// <summary>
+		/// The operations stack
+		/// </summary>
 		public Stack operations = new Stack();
+		/// <summary>
+		/// The socket
+		/// </summary>
 		public Socket workSocket = null;
 
-		public event EventHandler<ObjectReceievedEventArgs> objectReceived;
+		/// <summary>
+		/// Event fired when a complete object is received from bytes.
+		/// </summary>
+		public event EventHandler<ObjectReceivedEventArgs> objectReceived;
 
-		protected virtual void onObjectReceived(ObjectReceievedEventArgs e) {
-			EventHandler<ObjectReceievedEventArgs> handler = objectReceived;
+		/// <summary>
+		/// Event invocator for <see cref="objectReceived"/>.
+		/// </summary>
+		/// <param name="e">The <see cref="ObjectReceivedEventArgs"/> instance containing the event data.</param>
+		protected virtual void onObjectReceived(ObjectReceivedEventArgs e) {
+			EventHandler<ObjectReceivedEventArgs> handler = objectReceived;
 			if (handler != null)
 				handler(this, e);
 		}
 
+		/// <summary>
+		/// Initializes a new instance of the <see cref="ConnectionState"/> class.
+		/// </summary>
 		public ConnectionState() : this(Encoding.ASCII) {}
 
+		/// <summary>
+		/// Initializes a new instance of the <see cref="ConnectionState"/> class.
+		/// </summary>
+		/// <param name="encoding">The encoding.</param>
 		public ConnectionState(Encoding encoding) {
 			_encoding = encoding;
 		}
 
+		/// <summary>
+		/// Gets the encoding.
+		/// </summary>
+		/// <value>The encoding.</value>
 		public Encoding encoding {
 			get { return _encoding; }
 		}
 
+		/// <summary>
+		/// Updates the internal states based on the latest bytes read.
+		/// </summary>
+		/// <param name="bytesRead">The number of bytes read.</param>
+		/// <exception cref="System.NotImplementedException">
+		/// Operation not implemented for  + encoding.GetString(buffer, bufferIndex, 1)
+		/// or
+		/// Don't know what to do.
+		/// </exception>
+		/// <exception cref="System.InvalidOperationException">
+		/// Protocol Violation. Expected CR-LF.
+		/// or
+		/// Protocol Violation. Expected CR.
+		/// or
+		/// Protocol Violation. Expected LF.
+		/// </exception>
 		public void update(int bytesRead) {
 			int bufferIndex = 0;
 
@@ -173,16 +252,24 @@ namespace ConnectionsEducation.Redis {
 					Queue receivedObject = new Queue(receivedData.Count);
 					while (receivedData.Count > 0)
 						receivedObject.Enqueue(receivedData.Dequeue());
-					onObjectReceived(new ObjectReceievedEventArgs(receivedObject));
+					onObjectReceived(new ObjectReceivedEventArgs(receivedObject));
 				}
 			}
 		}
 
+		/// <summary>
+		/// Applies the specified value.
+		/// </summary>
+		/// <param name="value">The value.</param>
 		private void apply(object[] value) {
 			if (operations.Count == 0 || !applyToList(value))
 				receivedData.Enqueue(value);
 		}
 
+		/// <summary>
+		/// Applies the specified value.
+		/// </summary>
+		/// <param name="value">The value.</param>
 		private void apply(string value) {
 			if (operations.Count == 0) {
 				receivedData.Enqueue(value);
@@ -218,6 +305,11 @@ namespace ConnectionsEducation.Redis {
 			}
 		}
 
+		/// <summary>
+		/// Applies to list.
+		/// </summary>
+		/// <param name="value">The value.</param>
+		/// <returns><c>true</c> if the object was applied to a list, <c>false</c> if another application should be attempted.</returns>
 		private bool applyToList(object value) {
 			object nextOp = operations.Peek();
 			if (!(nextOp is AwaitList))
@@ -231,43 +323,109 @@ namespace ConnectionsEducation.Redis {
 			}
 		}
 
+		/// <summary>
+		/// Applies the specified value.
+		/// </summary>
+		/// <param name="value">The value.</param>
 		private void apply(long value) {
 			if (operations.Count == 0 || !applyToList(value)) {
 				receivedData.Enqueue(value);
 			}
 		}
 
+		/// <summary>
+		/// Applies the specified error.
+		/// </summary>
+		/// <param name="error">The error.</param>
 		private void apply(Exception error) {
 			if (operations.Count == 0 || !applyToList(error)) {
 				receivedData.Enqueue(error);
 			}
 		}
 
+		/// <summary>
+		/// Class AwaitSimpleString.
+		/// </summary>
 		private class AwaitSimpleString {
+			/// <summary>
+			/// Gets or sets the data.
+			/// </summary>
+			/// <value>The data.</value>
 			public byte[] data { get; set; }
 		}
 
+		/// <summary>
+		/// Class AwaitInt.
+		/// </summary>
 		private class AwaitInt {
+			/// <summary>
+			/// Gets or sets the data.
+			/// </summary>
+			/// <value>The data.</value>
 			public byte[] data { get; set; }
 		}
 
+		/// <summary>
+		/// Class AwaitString.
+		/// </summary>
 		private class AwaitString {
+			/// <summary>
+			/// Gets or sets a value indicating whether the object read the size.
+			/// </summary>
+			/// <value><c>true</c> if the object read the size; otherwise, <c>false</c>.</value>
 			public bool readSize { get; set; }
+			/// <summary>
+			/// Gets or sets the size.
+			/// </summary>
+			/// <value>The size.</value>
 			public int size { get; set; }
+			/// <summary>
+			/// Gets or sets the data.
+			/// </summary>
+			/// <value>The data.</value>
 			public byte[] data { get; set; }
 		}
 
+		/// <summary>
+		/// Class AwaitList.
+		/// </summary>
 		private class AwaitList {
+			/// <summary>
+			/// Gets or sets a value indicating whether the object read the length.
+			/// </summary>
+			/// <value><c>true</c> if the object read the length; otherwise, <c>false</c>.</value>
 			public bool readLength { get; set; }
+			/// <summary>
+			/// Gets or sets the length.
+			/// </summary>
+			/// <value>The length.</value>
 			public int length { get; set; }
+			/// <summary>
+			/// Gets or sets the objects read.
+			/// </summary>
+			/// <value>The objects read.</value>
 			public int objectsRead { get; set; }
+			/// <summary>
+			/// Gets or sets the data.
+			/// </summary>
+			/// <value>The data.</value>
 			public object[] data { get; set; }
 		}
 
+		/// <summary>
+		/// Class AwaitCommand.
+		/// </summary>
 		private class AwaitCommand {
 		}
 
+		/// <summary>
+		/// Class AwaitCrLf.
+		/// </summary>
 		private class AwaitCrLf {
+			/// <summary>
+			/// Gets or sets a value indicating whether a carriage return was read.
+			/// </summary>
+			/// <value><c>true</c> if CR was read; otherwise, <c>false</c>.</value>
 			public bool cr { get; set; }
 		}
 	}

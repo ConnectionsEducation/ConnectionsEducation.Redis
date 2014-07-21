@@ -10,6 +10,20 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleMemoryTest", "ConsoleMemoryTest\ConsoleMemoryTest.csproj", "{084A0541-DBBF-406D-B9EE-A28E7238643B}"
 EndProject
 Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 4
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://web.tfs2013.connectionseducation.com:8080/tfs/development
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = ..\\ConnectionsEducation.Redis.Test\\ConnectionsEducation.Redis.Test.csproj
+		SccProjectName1 = ../ConnectionsEducation.Redis.Test
+		SccLocalPath1 = ..\\ConnectionsEducation.Redis.Test
+		SccProjectUniqueName2 = ConsoleMemoryTest\\ConsoleMemoryTest.csproj
+		SccProjectName2 = ConsoleMemoryTest
+		SccLocalPath2 = ConsoleMemoryTest
+		SccProjectUniqueName3 = ConnectionsEducation.Redis.csproj
+		SccLocalPath3 = .
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU

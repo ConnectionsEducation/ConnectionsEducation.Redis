@@ -6,20 +6,56 @@ using System.Text;
 using System.Threading;
 
 namespace ConnectionsEducation.Redis {
+	/// <summary>
+	/// Connection client -- does the heavy-lifting of communicating with the redis server.
+	/// </summary>
 	public class ConnectionClient : IDisposable {
 		// Credit http://msdn.microsoft.com/en-us/library/bew39x2a(v=vs.100).aspx "Asynchronous Client Socket Example"
 
+		/// <summary>
+		/// Encoding
+		/// </summary>
 		private readonly Encoding _encoding;
+		/// <summary>
+		/// Host
+		/// </summary>
 		private readonly string _host;
+		/// <summary>
+		/// Port
+		/// </summary>
 		private readonly int _port;
+		/// <summary>
+		/// Connect is done
+		/// </summary>
 		private readonly ManualResetEventSlim _connectDone = new ManualResetEventSlim(false);
+		/// <summary>
+		/// Connect timeout in milliseconds
+		/// </summary>
 		private readonly int _connectTimeout;
+		/// <summary>
+		/// Command queue
+		/// </summary>
 		private readonly ConcurrentQueue<Command> _commands;
+		/// <summary>
+		/// Cancellation
+		/// </summary>
 		private readonly CancellationTokenSource _cancel;
+		/// <summary>
+		/// Client socket
+		/// </summary>
 		private readonly Socket _client;
-
+		/// <summary>
+		/// Connected
+		/// </summary>
 		private bool _connected;
 
+		/// <summary>
+		/// Initializes a <see cref="ConnectionClient"/>.
+		/// </summary>
+		/// <param name="host">The host</param>
+		/// <param name="port">The port</param>
+		/// <param name="connectTimeout">The connection timeout in milliseconds</param>
+		/// <param name="encoding">The encoding to use (optional: default ASCII)</param>
 		public ConnectionClient(string host = "127.0.0.1", int port = 6379, int connectTimeout = 1000, Encoding encoding = null) {
 			_host = host;
 			_port = port;
@@ -30,7 +66,10 @@ namespace ConnectionsEducation.Redis {
 
 			_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 		}
-
+		
+		/// <summary>
+		/// Connects
+		/// </summary>
 		public void connect() {
 			bool connect = false;
 
@@ -53,6 +92,10 @@ namespace ConnectionsEducation.Redis {
 			}
 		}
 
+		/// <summary>
+		/// Connect, part II
+		/// </summary>
+		/// <param name="result">Async result</param>
 		private void connect_then(IAsyncResult result) {
 			Socket client = (Socket)result.AsyncState;
 			try {
@@ -66,33 +109,60 @@ namespace ConnectionsEducation.Redis {
 			sendData(client);
 		}
 
+		/// <summary>
+		/// Gets the encoding
+		/// </summary>
 		public Encoding encoding {
 			get { return _encoding; }
 		}
 
-		public event EventHandler<ObjectReceievedEventArgs> objectReceived;
+		/// <summary>
+		/// Receives completed result objects "from the wire"
+		/// </summary>
+		public event EventHandler<ObjectReceivedEventArgs> objectReceived;
+		/// <summary>
+		/// Event raised when a connection error occurs.
+		/// </summary>
 		public event EventHandler connectionError;
 
+		/// <summary>
+		/// Event invovator for <see cref="connectionError"/>.
+		/// </summary>
 		protected virtual void onConnectionError() {
 			EventHandler handler = connectionError;
 			if (handler != null)
 				handler(this, EventArgs.Empty);
 		}
 
-		protected virtual void onObjectReceived(ObjectReceievedEventArgs e) {
-			EventHandler<ObjectReceievedEventArgs> handler = objectReceived;
+		/// <summary>
+		/// Event invocator for <see cref="objectReceived"/>
+		/// </summary>
+		/// <param name="e">Event arguments</param>
+		protected virtual void onObjectReceived(ObjectReceivedEventArgs e) {
+			EventHandler<ObjectReceivedEventArgs> handler = objectReceived;
 			if (handler != null)
 				handler(this, e);
 		}
 
+		/// <summary>
+		/// Queues a <see cref="Command"/> for sending over the wire.
+		/// </summary>
+		/// <param name="command">The command.</param>
 		public void send(Command command) {
 			_commands.Enqueue(command);
 		}
 
+		/// <summary>
+		/// Closes the client.
+		/// </summary>
 		protected virtual void close() {
 			_client.Close();
 		}
 
+		/// <summary>
+		/// Handler for receiving data.
+		/// </summary>
+		/// <param name="client">The socket to receive on.</param>
 		private void recvData(Socket client) {
 			if (!_connectDone.Wait(_connectTimeout))
 				onConnectionError();
@@ -103,12 +173,16 @@ namespace ConnectionsEducation.Redis {
 			} catch (ObjectDisposedException) {}
 		}
 
+		/// <summary>
+		/// <see cref="recvData"/>, part II.
+		/// </summary>
+		/// <param name="result">The async result.</param>
 		private void recvData_then(IAsyncResult result) {
 			if (_disposed || _cancel.IsCancellationRequested)
 				onConnectionError();
 			ConnectionState state = (ConnectionState)result.AsyncState;
 			Socket client = state.workSocket;
-			EventHandler<ObjectReceievedEventArgs> handler = new EventHandler<ObjectReceievedEventArgs>(objectReceived);
+			EventHandler<ObjectReceivedEventArgs> handler = new EventHandler<ObjectReceivedEventArgs>(objectReceived);
 			int bytesRead;
 			state.objectReceived += handler;
 			try {
@@ -128,10 +202,20 @@ namespace ConnectionsEducation.Redis {
 			}
 		}
 
+		/// <summary>
+		/// Advance the buffer in the state object.
+		/// </summary>
+		/// <param name="state">The state object</param>
+		/// <param name="bytesRead">The number of bytes read from the socket.</param>
 		private static void updateState(ConnectionState state, int bytesRead) {
 			state.update(bytesRead);
 		}
 
+		/// <summary>
+		/// Gets the next bytes to send over the wire.
+		/// </summary>
+		/// <param name="sendCommands">The queue of commands to send from.</param>
+		/// <returns>The bytes to send over the wire.</returns>
 		private static byte[] nextData(Tuple<Socket, ConcurrentQueue<Command>> sendCommands) {
 			Command nextCommand;
 			if (!sendCommands.Item2.TryDequeue(out nextCommand))
@@ -140,6 +224,10 @@ namespace ConnectionsEducation.Redis {
 				return nextCommand.getBytes();
 		}
 
+		/// <summary>
+		/// Sends data over the wire.
+		/// </summary>
+		/// <param name="client">The socket.</param>
 		private void sendData(Socket client) {
 			if (!_connectDone.Wait(_connectTimeout))
 				onConnectionError();
@@ -154,6 +242,10 @@ namespace ConnectionsEducation.Redis {
 			}
 		}
 
+		/// <summary>
+		/// <see cref="sendData"/>, part II.
+		/// </summary>
+		/// <param name="result">The async result.</param>
 		private void sendData_then(IAsyncResult result) {
 			if (_disposed || _cancel.IsCancellationRequested)
 				return;
@@ -178,14 +270,25 @@ namespace ConnectionsEducation.Redis {
 
 		#region Disposable
 
+		/// <summary>
+		/// Disposes the object and any unmanaged resources.
+		/// </summary>
 		public void Dispose() {
 			Dispose(true);
 			GC.SuppressFinalize(this);
 		}
 
+		/// <summary>
+		/// True if the object was disposed.
+		/// </summary>
 		private bool _disposed;
 
+		
 		// ReSharper disable once InconsistentNaming
+		/// <summary>
+		/// Disposes the object and any unmanaged resources.
+		/// </summary>
+		/// <param name="disposing">True if disposing from IDisposable.Dispose.</param>
 		protected virtual void Dispose(bool disposing) {
 			if (_disposed)
 				return;

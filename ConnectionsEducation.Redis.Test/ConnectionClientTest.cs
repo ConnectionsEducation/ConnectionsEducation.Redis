@@ -1,8 +1,14 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace ConnectionsEducation.Redis.Test {
+	/// <summary>
+	/// Test
+	/// </summary>
 	[TestClass]
 	public class ConnectionClientTest {
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void sendMultipleCommandsBeforeClosing() {
 			using (ConnectionClient client = new ConnectionClient()) {

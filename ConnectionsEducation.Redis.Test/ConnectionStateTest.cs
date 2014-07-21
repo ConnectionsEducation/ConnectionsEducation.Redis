@@ -3,11 +3,23 @@ using System.Collections;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace ConnectionsEducation.Redis.Test {
+	/// <summary>
+	/// Test
+	/// </summary>
 	[TestClass]
 	public class ConnectionStateTest {
+		/// <summary>
+		/// Test helper
+		/// </summary>
 		private Queue _receivedData;
+		/// <summary>
+		/// Test helper
+		/// </summary>
 		private ConnectionState _state;
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestInitialize]
 		public void initialize() {
 			_receivedData = new Queue();
@@ -15,10 +27,18 @@ namespace ConnectionsEducation.Redis.Test {
 			_state.objectReceived += _state_objectReceived;
 		}
 
-		private void _state_objectReceived(object sender, ObjectReceievedEventArgs e) {
+		/// <summary>
+		/// Test helper
+		/// </summary>
+		/// <param name="sender">The <see cref="ConnectionState"/></param>
+		/// <param name="e">The event arguments</param>
+		private void _state_objectReceived(object sender, ObjectReceivedEventArgs e) {
 			_receivedData.Enqueue(e.Object);
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void simpleStringAsOnlyBuffer_addsString() {	
 			const string EXPECTED = "PONG";
@@ -30,6 +50,9 @@ namespace ConnectionsEducation.Redis.Test {
 			assertString(EXPECTED, _receivedData.Dequeue());
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void bulkStringAsOnlyBuffer_addsString() {
 			const string EXPECTED = "foo bar";
@@ -41,6 +64,9 @@ namespace ConnectionsEducation.Redis.Test {
 			assertString(EXPECTED, _receivedData.Dequeue());
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void bulkStringNull_addsNull() {
 			byte[] protocolData = _state.encoding.GetBytes("$-1\r\n");
@@ -53,6 +79,9 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.IsNull(data.Dequeue());
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void integerAsOnlyBuffer_addsInt() {
 			byte[] protocolData = _state.encoding.GetBytes(":123\r\n");
@@ -67,6 +96,9 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.AreEqual(123L, (long)value);
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void simpleList() {
 			byte[] protocolData = _state.encoding.GetBytes("*3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$3\r\nbaz\r\n");
@@ -85,6 +117,9 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.AreEqual("baz", list[2]);
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void simpleListWithinList() {
 			byte[] protocolData = _state.encoding.GetBytes("*3\r\n$3\r\nfoo\r\n*2\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n$3\r\nbaz\r\n");
@@ -107,6 +142,11 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.AreEqual("baz", list[2]);
 		}
 
+		/// <summary>
+		/// Test helper
+		/// </summary>
+		/// <param name="expected">The expected value</param>
+		/// <param name="receivedValue">The received object</param>
 		private void assertString(string expected, object receivedValue) {
 			Queue data = (Queue)receivedValue;
 			Assert.IsNotNull(data);

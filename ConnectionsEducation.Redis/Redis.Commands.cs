@@ -37,7 +37,7 @@ namespace ConnectionsEducation.Redis {
 		/// <returns>The string stored by the specified key</returns>
 		public string get(string key) {
 			Command command = new Command("GET", key);
-			string value = resultToString(sendCommand(command));
+			string value = resultToString(sendCommand(command), encoding);
 			return value;
 		}
 
@@ -131,7 +131,7 @@ namespace ConnectionsEducation.Redis {
 			object[] value = sendCommand(command).Dequeue() as object[];
 			if (value == null)
 				return null;
-			return value.Select(element => element.ToString()).ToArray();
+			return value.Select(element => encoding.GetString((byte[])element)).ToArray();
 		}
 
 		/// <summary>
@@ -143,7 +143,7 @@ namespace ConnectionsEducation.Redis {
 		/// <returns>The score of the specified element in the specified set, or null if either the element or set do not exist</returns>
 		public double? zscore(string setKey, string element) {
 			Command command = new Command("ZSCORE", setKey, element);
-			string value = resultToString(sendCommand(command));
+			string value = resultToString(sendCommand(command), encoding);
 			double result;
 			return double.TryParse(value, out result) ? result : (double?)null;
 		}
@@ -169,7 +169,7 @@ namespace ConnectionsEducation.Redis {
 		/// <returns>The value</returns>
 		public string hget(string key, string field) {
 			Command command = new Command("HGET", key, field);
-			string value = resultToString(sendCommand(command));
+			string value = resultToString(sendCommand(command), encoding);
 			return value;
 		}
 
@@ -185,7 +185,7 @@ namespace ConnectionsEducation.Redis {
 			Array.Copy(fields, 0, arguments, 1, fields.Length);
 			Command command = new Command("HMGET", arguments);
 			object[] value = resultToArray(sendCommand(command));
-			return value.Select(v => v == null ? null : v.ToString()).ToArray();
+			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
 		}
 
 		/// <summary>
@@ -201,6 +201,117 @@ namespace ConnectionsEducation.Redis {
 			string ok = resultToString(sendCommand(command));
 			if (ok != "OK")
 				throw new InvalidOperationException("HMSET result is not OK!");
+		}
+
+		/// <summary>
+		/// Increments the specified field in the specified hash by the given amount, and returns the new value.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <param name="field">The field in the hash</param>
+		/// <param name="valueToIncrementBy">The amount to increment the field by</param>
+		/// <returns>The new value of the field</returns>
+		public long hincrby(string key, string field, long valueToIncrementBy) {
+			Command command = new Command("HINCRBY", key, field, Convert.ToString(valueToIncrementBy));
+			long value = resultToNumber(sendCommand(command));
+			return value;
+		}
+
+		/// <summary>
+		/// Gets the names of all of the fields in the specified hash.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <returns>The field names</returns>
+		public string[] hkeys(string key) {
+			Command command = new Command("HKEYS", key);
+			object[] value = resultToArray(sendCommand(command));
+			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
+		}
+
+		/// <summary>
+		/// Gets if the field exists in the specified hash.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <param name="field">The field</param>
+		/// <returns>True if the field exists; false otherwise.</returns>
+		public bool hexists(string key, string field) {
+			Command command = new Command("HEXISTS", key, field);
+			long value = resultToNumber(sendCommand(command));
+			return value != 0;
+		}
+
+		/// <summary>
+		/// Removes the given field from the specified hash, if it exists, and returns the number of fields removed.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <param name="field">The field to remove</param>
+		/// <returns>The number of fields actually removed</returns>
+		public long hdel(string key, string field) {
+			Command command = new Command("HDEL", key, field);
+			long value = resultToNumber(sendCommand(command));
+			return value;
+		}
+
+		/// <summary>
+		/// Removes the given fields from the specified hash, if it exists, and returns the number of fields removed. (Requires Redis version 2.4+)
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <param name="field">The first field to remove</param>
+		/// <param name="additionalFields">The additional fields to remove.</param>
+		/// <returns>The number of fields actually removed</returns>
+		public long hdel(string key, string field, params string[] additionalFields) {
+			string[] arguments = new string[additionalFields.Length + 2];
+			arguments[0] = key;
+			arguments[1] = field;
+			Array.Copy(additionalFields, 0, arguments, 2, additionalFields.Length);
+			Command command = new Command("HDEL", arguments);
+			long value = resultToNumber(sendCommand(command));
+			return value;
+		}
+
+		/// <summary>
+		/// Gets the number of fields in the specified hash.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <returns>The number of fields</returns>
+		public long hlen(string key) {
+			Command command = new Command("HLEN", key);
+			long value = resultToNumber(sendCommand(command));
+			return value;
+		}
+
+		/// <summary>
+		/// Sets the specified field in the hash to the given value, only if the field does not already exist in the hash.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <param name="field">The field</param>
+		/// <param name="value">The value to set</param>
+		/// <returns>True if the field was set to the value; false if it was not (because the field already existed)</returns>
+		public bool hsetnx(string key, string field, string value) {
+			Command command = new Command("HSETNX", key, field, value);
+			long isNewValue = resultToNumber(sendCommand(command));
+			return isNewValue > 0;
+		}
+
+		/// <summary>
+		/// Gets the values stored in the given hash across all of its fields.
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <returns>The values</returns>
+		public string[] hvals(string key) {
+			Command command = new Command("HVALS", key);
+			object[] value = resultToArray(sendCommand(command));
+			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
+		}
+
+		/// <summary>
+		/// Gets whether or not the key exists
+		/// </summary>
+		/// <param name="key">The object key</param>
+		/// <returns>True if the object exists for the given key; false if it does not</returns>
+		public bool exists(string key) {
+			Command command = new Command("EXISTS", key);
+			long value = resultToNumber(sendCommand(command));
+			return value > 0;
 		}
 	}
 }

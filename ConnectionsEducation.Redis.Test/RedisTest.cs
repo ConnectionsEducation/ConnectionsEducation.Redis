@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Diagnostics;
+using System.Text;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace ConnectionsEducation.Redis.Test {
@@ -250,6 +252,270 @@ namespace ConnectionsEducation.Redis.Test {
 				redis.set("foo", "bar");
 				Assert.IsTrue(redis.expire("foo", 10));
 				Assert.IsFalse(redis.expire("bar", 10));
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testStringCommand() {
+			using (Redis redis = new Redis()) {
+				const string EXPECTED = "Hello World!";
+				Command command = new Command("ECHO", EXPECTED);
+				string actual = redis.stringCommand(command);
+				Assert.AreEqual(EXPECTED, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testNumberCommand() {
+			using (Redis redis = new Redis()) {
+				redis.set("foonumber", "41");
+				Command command = new Command("INCR", "foonumber");
+				long actual = redis.numberCommand(command);
+				Assert.AreEqual(42, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testSetBytesGet() {
+			using (Redis redis = new Redis()) {
+				byte[] expected = {8, 6, 7, 5, 3, 0, 9};
+				byte[] key = Encoding.ASCII.GetBytes("foobytes");
+				Command command = new Command("SET", key, expected);
+				redis.executeCommand(command);
+				command = new Command("GET", key);
+				byte[] actual = redis.executeCommand(command) as byte[];
+				CollectionAssert.AreEqual(expected, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testDoubleCommand() {
+			using (Redis redis = new Redis()) {
+				Command command = Command.fromString("*1\r\n$4\r\nPING\r\n*1\r\n$4\r\nPING\r\n");
+				IEnumerator enumerator = redis.enumerateCommand(command);
+				Assert.IsTrue(enumerator.MoveNext());
+				Assert.AreEqual("PONG", Encoding.ASCII.GetString((byte[])enumerator.Current));
+				Assert.IsTrue(enumerator.MoveNext());
+				Assert.AreEqual("PONG", Encoding.ASCII.GetString((byte[])enumerator.Current));
+				Assert.IsFalse(enumerator.MoveNext());
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHIncrBy_existing() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "value", "41");
+				long actual = redis.hincrby("foohash", "value", 1);
+				Assert.AreEqual(42L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHIncrBy_new() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				long actual = redis.hincrby("foohash", "value", 1L);
+				Assert.AreEqual(1L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHIncrBy_newhash() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				long actual = redis.hincrby("foohash", "value", 42L);
+				Assert.AreEqual(42L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHIncrBy_negative() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "value", "3");
+				long actual = redis.hincrby("foohash", "value", -7);
+				Assert.AreEqual(-4L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHKeys() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "bar1", "1");
+				redis.hset("foohash", "bar3", "3");
+				redis.hset("foohash", "bar2", "2");
+				string[] actual = redis.hkeys("foohash");
+				CollectionAssert.Contains(actual, "bar1");
+				CollectionAssert.Contains(actual, "bar2");
+				CollectionAssert.Contains(actual, "bar3");
+				Assert.AreEqual(3, actual.Length);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHExists() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "bar1", "1");
+				redis.hset("foohash", "bar3", "3");
+				Assert.IsTrue(redis.hexists("foohash", "bar1"));
+				Assert.IsFalse(redis.hexists("foohash", "bar2"));
+				Assert.IsTrue(redis.hexists("foohash", "bar3"));
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHDel() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "bar1", "1");
+				redis.hset("foohash", "bar3", "3");
+				long actual = redis.hdel("foohash", "bar1");
+				Assert.AreEqual(1L, actual);
+				actual = redis.hdel("foohash", "bar1");
+				Assert.AreEqual(0L, actual);
+				actual = redis.hdel("foohash", "bar2");
+				Assert.AreEqual(0L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHDel_hashDoesNotExist() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				long actual = redis.hdel("foohash", "bar1");
+				Assert.AreEqual(0L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHDel_multipleFields() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "bar1", "1");
+				redis.hset("foohash", "bar3", "3");
+				long actual = redis.hdel("foohash", "bar1", "bar2", "bar3");
+				Assert.AreEqual(2L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHLen() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "bar1", "1");
+				redis.hset("foohash", "bar3", "3");
+				long actual = redis.hlen("foohash");
+				Assert.AreEqual(2L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHLen_notExists() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				long actual = redis.hlen("foohash");
+				Assert.AreEqual(0L, actual);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHSetNx() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "value", "bar");
+				Assert.IsFalse(redis.hsetnx("foohash", "value", "baz"));
+				Assert.IsTrue(redis.hsetnx("foohash", "value2", "2"));
+				Assert.AreEqual("bar", redis.hget("foohash", "value"));
+				Assert.AreEqual("2", redis.hget("foohash", "value2"));
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testHVals() {
+			using (Redis redis = new Redis()) {
+				redis.del("foohash");
+				redis.hset("foohash", "bar1", "1");
+				redis.hset("foohash", "bar3", "3");
+				string[] actual = redis.hvals("foohash");
+				CollectionAssert.Contains(actual, "1");
+				CollectionAssert.Contains(actual, "3");
+				Assert.AreEqual(2, actual.Length);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		[ExpectedException(typeof(RedisErrorException))]
+		public void testErrorException() {
+			using (Redis redis = new Redis()) {
+				Command command = new Command("notacommand", "foobar");
+				redis.executeCommand(command);
+			}
+		}
+
+		[TestMethod]
+		public void testExists() {
+			using (Redis redis = new Redis()) {
+				redis.set("foo", "bar");
+				Assert.IsTrue(redis.exists("foo"));
+				redis.del("foo");
+				Assert.IsFalse(redis.exists("foo"));
 			}
 		}
 	}

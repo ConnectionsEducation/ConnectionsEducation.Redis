@@ -112,9 +112,9 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.IsTrue(value is object[], "Data is not a list");
 			object[] list = (object[])value;
 			Assert.AreEqual(3, list.Length, "Data has wrong length");
-			Assert.AreEqual("foo", list[0]);
-			Assert.AreEqual("bar", list[1]);
-			Assert.AreEqual("baz", list[2]);
+			Assert.AreEqual("foo", stringify(list[0]));
+			Assert.AreEqual("bar", stringify(list[1]));
+			Assert.AreEqual("baz", stringify(list[2]));
 		}
 
 		/// <summary>
@@ -133,14 +133,31 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.IsTrue(value is object[], "Data is not a list");
 			object[] list = (object[])value;
 			Assert.AreEqual(3, list.Length, "Data has wrong length");
-			Assert.AreEqual("foo", list[0]);
+			Assert.AreEqual("foo", stringify(list[0]));
 			object[] listInList = list[1] as object[];
 			Assert.IsNotNull(listInList);
 			Assert.AreEqual(2, listInList.Length);
-			Assert.AreEqual("bar1", listInList[0]);
-			Assert.AreEqual("bar2", listInList[1]);
-			Assert.AreEqual("baz", list[2]);
+			Assert.AreEqual("bar1", stringify(listInList[0]));
+			Assert.AreEqual("bar2", stringify(listInList[1]));
+			Assert.AreEqual("baz", stringify(list[2]));
 		}
+
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void errorAsOnlyBuffer_addsException() {
+			byte[] protocolData = _state.encoding.GetBytes("-Goodbye, cruel world!\r\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+
+			_state.update(protocolData.Length);
+
+			object value = _receivedData.Dequeue();
+			assertError(typeof(RedisErrorException), value);
+		}
+
+		#region Helper methods
 
 		/// <summary>
 		/// Test helper
@@ -152,8 +169,36 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.IsNotNull(data);
 			Assert.AreEqual(1, data.Count, "Data does not contain any objects.");
 			object value = data.Dequeue();
-			Assert.IsTrue(value is string, "Data is not a string.");
-			Assert.AreEqual(expected, value as string);
+			string actual = _state.encoding.GetString((byte[])value);
+			Assert.AreEqual(expected, actual);
 		}
+
+
+		/// <summary>
+		/// Test helper
+		/// </summary>
+		/// <param name="exceptionType">The type of exception to expect</param>
+		/// <param name="receivedValue">The received object</param>
+		/// <param name="expectedMessage">The expected message; or null not to test this</param>
+		private void assertError(Type exceptionType, object receivedValue, string expectedMessage = null) {
+			Queue data = (Queue)receivedValue;
+			Assert.IsNotNull(data);
+			Assert.AreEqual(1, data.Count, "Data does not contain any objects.");
+			object value = data.Dequeue();
+			Assert.IsInstanceOfType(value, exceptionType);
+			if (value is Exception && expectedMessage != null)
+				Assert.AreEqual(expectedMessage, (value as Exception).Message);
+		}
+
+		/// <summary>
+		/// Test helper for parsing byte arrays as strings
+		/// </summary>
+		/// <param name="data">The byte array</param>
+		/// <returns>The string</returns>
+		private string stringify(object data) {
+			return _state.encoding.GetString((byte[])data);
+		}
+
+		#endregion
 	}
 }

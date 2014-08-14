@@ -152,6 +152,12 @@ namespace ConnectionsEducation.Redis {
 							operations.Push(new AwaitSimpleString());
 							++bufferIndex;
 							continue;
+						case MINUS:
+							operations.Pop();
+							operations.Push(new AwaitError());
+							operations.Push(new AwaitSimpleString());
+							++bufferIndex;
+							continue;
 						default:
 							throw new NotImplementedException("Operation not implemented for " + encoding.GetString(buffer, bufferIndex, 1));
 					}
@@ -192,9 +198,13 @@ namespace ConnectionsEducation.Redis {
 						bufferIndex = buffer.Length;
 					} else {
 						byte[] stringData = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex).Take(indexCrLf - bufferIndex)).ToArray();
-						string value = _encoding.GetString(stringData);
 						operations.Pop();
-						apply(value);
+						if (operations.Count > 0 && operations.Peek() is AwaitError) {
+							operations.Pop();
+							apply(new RedisErrorException(encoding.GetString(stringData)));
+						} else {
+							applyString(stringData);
+						}
 						bufferIndex = indexCrLf + CrLf.Length;
 					}
 				} else if (nextOp is AwaitInt) {
@@ -221,9 +231,8 @@ namespace ConnectionsEducation.Redis {
 					if (currentSize + availableLength >= op.size) {
 						int count = op.size - op.data.Length;
 						byte[] stringData = op.data.Concat(buffer.Skip(bufferIndex).Take(count)).ToArray();
-						string value = _encoding.GetString(stringData);
 						operations.Pop();
-						apply(value);
+						applyString(stringData);
 						bufferIndex = bufferIndex + count;
 						operations.Push(new AwaitCrLf());
 						continue;
@@ -270,7 +279,7 @@ namespace ConnectionsEducation.Redis {
 		/// Applies the specified value.
 		/// </summary>
 		/// <param name="value">The value.</param>
-		private void apply(string value) {
+		private void applyString(byte[] value) {
 			if (operations.Count == 0) {
 				receivedData.Enqueue(value);
 				return;
@@ -279,22 +288,22 @@ namespace ConnectionsEducation.Redis {
 			object nextOp = operations.Peek();
 			if (nextOp is AwaitString && !((AwaitString)nextOp).readSize) {
 				AwaitString op = (AwaitString)nextOp;
-				int size = Convert.ToInt32(value);
+				int size = Convert.ToInt32(Encoding.ASCII.GetString(value));
 				op.readSize = true;
 				op.size = size;
 				op.data = new byte[] {};
 				if (op.size < 0) {
 					operations.Pop();
-					apply((string)null);
+					applyString(null);
 				}
 			} else if (nextOp is AwaitList && !((AwaitList)nextOp).readLength) {
 				AwaitList op = (AwaitList)nextOp;
-				int length = Convert.ToInt32(value);
+				int length = Convert.ToInt32(Encoding.ASCII.GetString(value));
 				op.readLength = true;
 				op.length = length;
 				if (op.length < 0) {
 					operations.Pop();
-					apply((string)null);
+					applyString(null);
 				}
 				op.data = new object[length];
 			} else {
@@ -416,6 +425,12 @@ namespace ConnectionsEducation.Redis {
 		/// Class AwaitCommand.
 		/// </summary>
 		private class AwaitCommand {
+		}
+
+		/// <summary>
+		/// Class AwaitError.
+		/// </summary>
+		private class AwaitError {
 		}
 
 		/// <summary>

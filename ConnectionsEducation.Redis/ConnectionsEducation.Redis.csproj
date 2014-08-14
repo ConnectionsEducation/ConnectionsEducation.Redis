@@ -15,6 +15,7 @@
     <SccLocalPath>SAK</SccLocalPath>
     <SccAuxPath>SAK</SccAuxPath>
     <SccProvider>SAK</SccProvider>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -32,6 +33,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\ConnectionsEducation.Redis.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
@@ -46,12 +48,14 @@
   <ItemGroup>
     <Compile Include="ByteArrayExtensions.cs" />
     <Compile Include="Command.cs" />
+    <Compile Include="Extensions\RedisExtensions.cs" />
     <Compile Include="Redis.Commands.cs" />
     <Compile Include="Redis.cs" />
     <Compile Include="ConnectionClient.cs" />
     <Compile Include="ConnectionState.cs" />
     <Compile Include="ObjectReceivedEventArgs.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RedisErrorException.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="development.snk" />

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -191,13 +192,15 @@ namespace ConnectionsEducation.Redis {
 						}
 					}
 				} else if (nextOp is AwaitSimpleString) {
-					int indexCrLf = buffer.indexOf(CrLf, bufferIndex);
 					AwaitSimpleString op = (AwaitSimpleString)nextOp;
+					IEnumerable<byte> partialBuffer = buffer.Skip(bufferIndex).Take(bytesRead - bufferIndex);
+					byte[] potential = op.data == null ? partialBuffer.ToArray() : op.data.Concat(partialBuffer).ToArray();
+					int indexCrLf = potential.indexOf(CrLf);
 					if (indexCrLf == -1) {
-						op.data = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex)).ToArray();
+						op.data = potential;
 						bufferIndex = buffer.Length;
 					} else {
-						byte[] stringData = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex).Take(indexCrLf - bufferIndex)).ToArray();
+						byte[] stringData = potential.Take(indexCrLf).ToArray();
 						operations.Pop();
 						if (operations.Count > 0 && operations.Peek() is AwaitError) {
 							operations.Pop();
@@ -205,24 +208,27 @@ namespace ConnectionsEducation.Redis {
 						} else {
 							applyString(stringData);
 						}
-						bufferIndex = indexCrLf + CrLf.Length;
+						bufferIndex += indexCrLf + CrLf.Length - (op.data == null ? 0 : op.data.Length);
 					}
 				} else if (nextOp is AwaitInt) {
-					int indexCrLf = buffer.indexOf(CrLf, bufferIndex);
 					AwaitInt op = (AwaitInt)nextOp;
+					IEnumerable<byte> partialBuffer = buffer.Skip(bufferIndex).Take(bytesRead - bufferIndex);
+					byte[] potential = op.data == null ? partialBuffer.ToArray() : op.data.Concat(partialBuffer).ToArray();
+					int indexCrLf = potential.indexOf(CrLf);
 					if (indexCrLf == -1) {
-						op.data = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex)).ToArray();
+						op.data = potential;
 						bufferIndex = buffer.Length;
 					} else {
-						byte[] stringData = (op.data ?? Enumerable.Empty<byte>()).Concat(buffer.Skip(bufferIndex).Take(indexCrLf - bufferIndex)).ToArray();
+						byte[] stringData = potential.Take(indexCrLf).ToArray();
 						string valueLiteral = _encoding.GetString(stringData);
 						operations.Pop();
 						long value;
-						if (long.TryParse(valueLiteral, out value))
+						if (long.TryParse(valueLiteral, out value)) {
 							apply(value);
-						else
+						} else {
 							apply(new Exception(string.Format("Failed to parse {0} as an integer", valueLiteral)));
-						bufferIndex = indexCrLf + CrLf.Length;
+						}
+						bufferIndex += indexCrLf + CrLf.Length - (op.data == null ? 0 : op.data.Length);
 					}
 				} else if (nextOp is AwaitString) {
 					AwaitString op = (AwaitString)nextOp;

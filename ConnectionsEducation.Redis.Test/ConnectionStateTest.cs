@@ -100,6 +100,23 @@ namespace ConnectionsEducation.Redis.Test {
 		/// Test
 		/// </summary>
 		[TestMethod]
+		public void crlfBetweenBufferWhenReadingInt() {
+			const long EXPECTED = 123L;
+			byte[] protocolData = _state.encoding.GetBytes(":123\r");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+			_state.update(protocolData.Length);
+
+			protocolData = _state.encoding.GetBytes("\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+			_state.update(protocolData.Length);
+
+			assertNumber(EXPECTED, _receivedData.Dequeue());
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
 		public void simpleList() {
 			byte[] protocolData = _state.encoding.GetBytes("*3\r\n$3\r\nfoo\r\n$3\r\nbar\r\n$3\r\nbaz\r\n");
 			Array.Copy(protocolData, _state.buffer, protocolData.Length);
@@ -142,6 +159,22 @@ namespace ConnectionsEducation.Redis.Test {
 			Assert.AreEqual("baz", stringify(list[2]));
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void crlfBetweenBuffersWhenReadingStringSize() {
+			const string EXPECTED = "THE STRING";
+			byte[] protocolData = _state.encoding.GetBytes("$10\r");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+			_state.update(protocolData.Length);
+
+			protocolData = _state.encoding.GetBytes("\nTHE STRING\r\n");
+			Array.Copy(protocolData, _state.buffer, protocolData.Length);
+			_state.update(protocolData.Length);
+
+			assertString(EXPECTED, _receivedData.Dequeue());
+		}
 
 		/// <summary>
 		/// Test
@@ -171,6 +204,20 @@ namespace ConnectionsEducation.Redis.Test {
 			object value = data.Dequeue();
 			string actual = _state.encoding.GetString((byte[])value);
 			Assert.AreEqual(expected, actual);
+		}
+
+		/// <summary>
+		/// Test helper
+		/// </summary>
+		/// <param name="expected">The expected value</param>
+		/// <param name="receivedValue">The received object</param>
+		private void assertNumber(long expected, object receivedValue) {
+			Queue data = (Queue)receivedValue;
+			Assert.IsNotNull(data);
+			Assert.AreEqual(1, data.Count, "Data does not contain any objects.");
+			object value = data.Dequeue();
+			Assert.IsTrue(value is long, "Data is not an integer");
+			Assert.AreEqual(123L, (long)value);
 		}
 
 

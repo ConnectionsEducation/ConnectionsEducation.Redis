@@ -605,5 +605,35 @@ namespace ConnectionsEducation.Redis.Test {
 				CollectionAssert.IsSubsetOf(result.results, new string[] {});
 			}
 		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testScan_multipleIterations() {
+			using (Redis redis = new Redis()) {
+				Redis.ScanResult result = null;
+				string[] keys = {
+					"key1", "key2", "key3", "key4", "test1", "test2", "test3", "test4",
+					"key5", "key6", "key7", "key8", "test5", "test6", "test7", "test8",
+					"foo1", "foo2", "foo3", "foo4", "fuzz1", "fuzz2", "fuzz3", "fuzz4",
+					"foo5", "foo6", "foo7", "foo8", "fuzz5", "fuzz6", "fuzz7", "fuzz8",
+				};
+				foreach (string key in keys) {
+					redis.set(key, "scantest");
+				}
+
+				int iterations = 0;
+				do {
+					result = redis.scan(result == null ? 0L : result.nextCursor);
+					iterations += 1;
+
+					CollectionAssert.IsSubsetOf(result.results, keys);
+				} while (result.nextCursor != 0);
+
+				if (iterations == 1)
+					Assert.Inconclusive("Unable to iterate multiple times. Add more keys or use COUNT option.");
+			}
+		}
 	}
 }

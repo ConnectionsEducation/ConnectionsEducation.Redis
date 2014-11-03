@@ -530,7 +530,7 @@ namespace ConnectionsEducation.Redis.Test {
 		/// Test
 		/// </summary>
 		[TestMethod]
-		public void testKeysAll() {
+		public void testKeys_wildcardAll() {
 			using (Redis redis = new Redis()) {
 				redis.set("foo", "bar");
 				redis.set("bar", "foo");
@@ -545,6 +545,46 @@ namespace ConnectionsEducation.Redis.Test {
 				CollectionAssert.Contains(keys, "baz");
 				CollectionAssert.Contains(keys, "fuzz");
 				Assert.AreEqual(4, keys.Length);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testKeys_startsWithPattern() {
+			using (Redis redis = new Redis()) {
+				redis.set("foo", "bar");
+				redis.set("bar", "foo");
+				redis.set("baz", "hello world");
+				redis.hset("fuzz", "a", "apple");
+				redis.hset("fuzz", "b", "banana");
+
+				string[] keys = redis.keys("f*");
+
+				CollectionAssert.Contains(keys, "foo");
+				CollectionAssert.Contains(keys, "fuzz");
+				Assert.AreEqual(2, keys.Length);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testKeys_endsWithPattern() {
+			using (Redis redis = new Redis()) {
+				redis.set("foo", "bar");
+				redis.set("bar", "foo");
+				redis.set("baz", "hello world");
+				redis.hset("fuzz", "a", "apple");
+				redis.hset("fuzz", "b", "banana");
+
+				string[] keys = redis.keys("*z");
+
+				CollectionAssert.Contains(keys, "baz");
+				CollectionAssert.Contains(keys, "fuzz");
+				Assert.AreEqual(2, keys.Length);
 			}
 		}
 	}

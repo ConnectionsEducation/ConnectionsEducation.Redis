@@ -323,5 +323,16 @@ namespace ConnectionsEducation.Redis {
 			object[] value = resultToArray(sendCommand(command));
 			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
 		}
+
+		/// <summary>
+		/// Gets the keys from a database matching the specified pattern
+		/// </summary>
+		/// <param name="pattern">The pattern to match for the key name</param>
+		/// <returns>The keys in the database matching the specified pattern.</returns>
+		public string[] keys(string pattern) {
+			Command command = new Command(encoding, "KEYS", pattern);
+			object[] value = resultToArray(sendCommand(command));
+			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
+		}
 	}
 }

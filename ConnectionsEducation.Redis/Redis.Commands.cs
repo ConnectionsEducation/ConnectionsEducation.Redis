@@ -313,5 +313,15 @@ namespace ConnectionsEducation.Redis {
 			long value = resultToNumber(sendCommand(command));
 			return value > 0;
 		}
+
+		/// <summary>
+		/// Gets the keys from a database
+		/// </summary>
+		/// <returns>The keys in the database</returns>
+		public string[] keys() {
+			Command command = new Command("KEYS", "*");
+			object[] value = resultToArray(sendCommand(command));
+			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
+		}
 	}
 }

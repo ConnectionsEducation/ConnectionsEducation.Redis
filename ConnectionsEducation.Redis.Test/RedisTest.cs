@@ -33,6 +33,13 @@ namespace ConnectionsEducation.Redis.Test {
 			_redisServer.CloseMainWindow();
 		}
 
+		[TestInitialize]
+		public void testInitialize() {
+			using (Redis redis = new Redis()) {
+				redis.executeCommand(new Command("flushall", new string[] { }));
+			}
+		}
+
 		/// <summary>
 		/// Test
 		/// </summary>
@@ -516,6 +523,28 @@ namespace ConnectionsEducation.Redis.Test {
 				Assert.IsTrue(redis.exists("foo"));
 				redis.del("foo");
 				Assert.IsFalse(redis.exists("foo"));
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testKeysAll() {
+			using (Redis redis = new Redis()) {
+				redis.set("foo", "bar");
+				redis.set("bar", "foo");
+				redis.set("baz", "hello world");
+				redis.hset("fuzz", "a", "apple");
+				redis.hset("fuzz", "b", "banana");
+
+				string[] keys = redis.keys();
+
+				CollectionAssert.Contains(keys, "foo");
+				CollectionAssert.Contains(keys, "bar");
+				CollectionAssert.Contains(keys, "baz");
+				CollectionAssert.Contains(keys, "fuzz");
+				Assert.AreEqual(4, keys.Length);
 			}
 		}
 	}

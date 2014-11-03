@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace ConnectionsEducation.Redis {
 	/// <summary>
@@ -145,7 +146,7 @@ namespace ConnectionsEducation.Redis {
 			Command command = new Command("ZSCORE", setKey, element);
 			string value = resultToString(sendCommand(command), encoding);
 			double result;
-			return double.TryParse(value, out result) ? result : (double?)null;
+			return Double.TryParse(value, out result) ? result : (double?)null;
 		}
 
 		/// <summary>
@@ -333,6 +334,21 @@ namespace ConnectionsEducation.Redis {
 			Command command = new Command(encoding, "KEYS", pattern);
 			object[] value = resultToArray(sendCommand(command));
 			return value.Select(v => v == null ? null : encoding.GetString((byte[])v)).ToArray();
+		}
+
+		/// <summary>
+		/// Iterates over the keys in the database
+		/// </summary>
+		/// <param name="cursor">The starting cursor, or 0 for a new iteration</param>
+		/// <returns>The result of the iteration at the current step</returns>
+		public ScanResult scan(long cursor = 0L) {
+			Command command = new Command("SCAN", cursor.ToString(CultureInfo.InvariantCulture));
+			object[] result = resultToArray(sendCommand(command));
+			string newCursorValue = Encoding.ASCII.GetString((byte[])result[0]);
+			long newCursor = Convert.ToInt64(newCursorValue);
+			object[] resultsRaw = (object[])result[1];
+			string[] results = resultsRaw.Select(r => r == null ? null : encoding.GetString((byte[])r)).ToArray();
+			return new ScanResult(cursor, newCursor, results);
 		}
 	}
 }

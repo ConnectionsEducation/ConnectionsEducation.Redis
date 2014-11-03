@@ -33,6 +33,9 @@ namespace ConnectionsEducation.Redis.Test {
 			_redisServer.CloseMainWindow();
 		}
 
+		/// <summary>
+		/// Per-test initialization: clear the database
+		/// </summary>
 		[TestInitialize]
 		public void testInitialize() {
 			using (Redis redis = new Redis()) {
@@ -516,6 +519,9 @@ namespace ConnectionsEducation.Redis.Test {
 			}
 		}
 
+		/// <summary>
+		/// Test
+		/// </summary>
 		[TestMethod]
 		public void testExists() {
 			using (Redis redis = new Redis()) {
@@ -585,6 +591,18 @@ namespace ConnectionsEducation.Redis.Test {
 				CollectionAssert.Contains(keys, "baz");
 				CollectionAssert.Contains(keys, "fuzz");
 				Assert.AreEqual(2, keys.Length);
+			}
+		}
+
+		/// <summary>
+		/// Test
+		/// </summary>
+		[TestMethod]
+		public void testScan_emptyDatabase() {
+			using (Redis redis = new Redis()) {
+				Redis.ScanResult result = redis.scan();
+				Assert.AreEqual(0L, result.nextCursor);
+				CollectionAssert.IsSubsetOf(result.results, new string[] {});
 			}
 		}
 	}

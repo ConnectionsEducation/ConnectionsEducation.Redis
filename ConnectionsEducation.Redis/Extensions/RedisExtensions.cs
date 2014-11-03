@@ -61,5 +61,24 @@ namespace ConnectionsEducation.Redis.Extensions {
 			long updatedExpiry = redis.numberCommand(command);
 			return updatedExpiry > 0;
 		}
+
+		/// <summary>
+		/// Enumerates all of the keys
+		/// </summary>
+		/// <param name="redis">The redis client</param>
+		/// <returns>The keys in the database</returns>
+		public static IEnumerable<string> allKeys(this Redis redis) {
+			HashSet<string> existingKeys = new HashSet<string>();
+			long cursor = 0L;
+			do {
+				Redis.ScanResult result = redis.scan(cursor);
+				cursor = result.nextCursor;
+
+				foreach (string newKey in result.results.Except(existingKeys)) {
+					yield return newKey;
+				}
+				existingKeys.UnionWith(result.results);
+			} while (cursor != 0);
+		}
 	}
 }

@@ -20,9 +20,10 @@ namespace ConnectionsEducation.Redis.Test {
 		/// </summary>
 		/// <param name="testContext">The test context</param>
 		[AssemblyInitialize]
-		[DeploymentItem("redis-2.6\\redis-server.exe", "redis-2.6")]
+		[DeploymentItem("redis-2.8\\redis-server.exe", "redis-2.8")]
+		[DeploymentItem("redis-2.8\\redis.conf", "redis-2.8")]
 		public static void initialize(TestContext testContext) {
-			_redisServer = Process.Start("redis-2.6\\redis-server.exe");
+			_redisServer = Process.Start("redis-2.8\\redis-server.exe", "redis-2.8\\redis.conf");
 		}
 
 		/// <summary>

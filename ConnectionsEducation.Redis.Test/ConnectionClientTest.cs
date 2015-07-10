@@ -14,6 +14,7 @@ namespace ConnectionsEducation.Redis.Test {
 			using (ConnectionClient client = new ConnectionClient()) {
 				Command command = Command.fromString("PING\r\n");
 				Command command2 = Command.fromString("PING\r\n");
+				client.connect();
 				client.send(command);
 				client.send(command2);
 			}

@@ -57,6 +57,7 @@
     </Otherwise>
   </Choose>
   <ItemGroup>
+    <Compile Include="AuthTest.cs" />
     <Compile Include="ByteArrayExtensionsTest.cs" />
     <Compile Include="ConnectionClientTest.cs" />
     <Compile Include="ConnectionStateTest.cs" />
@@ -78,6 +79,11 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="redis-2.8\redis.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="redis-2.8\redis-auth.conf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

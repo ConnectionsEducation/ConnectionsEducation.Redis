@@ -52,7 +52,7 @@ namespace ConnectionsEducation.Redis {
 		private static int parseBytes(byte[] bytes) {
 			int commands = 0;
 			ConnectionState parser = new ConnectionState();
-			parser.objectReceived += (s, e) => commands++;
+			parser.setObjectReceivedAction(args => commands++);
 			parser.buffer = bytes;
 			try {
 				parser.update(bytes.Length);

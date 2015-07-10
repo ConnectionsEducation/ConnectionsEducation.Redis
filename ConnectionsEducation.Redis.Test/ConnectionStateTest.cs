@@ -24,15 +24,14 @@ namespace ConnectionsEducation.Redis.Test {
 		public void initialize() {
 			_receivedData = new Queue();
 			_state = new ConnectionState();
-			_state.objectReceived += _state_objectReceived;
+			new PrivateObject(_state).Invoke("setObjectReceivedAction", new Action<ObjectReceivedEventArgs>(_state_objectReceived));
 		}
 
 		/// <summary>
 		/// Test helper
 		/// </summary>
-		/// <param name="sender">The <see cref="ConnectionState"/></param>
 		/// <param name="e">The event arguments</param>
-		private void _state_objectReceived(object sender, ObjectReceivedEventArgs e) {
+		private void _state_objectReceived(ObjectReceivedEventArgs e) {
 			_receivedData.Enqueue(e.Object);
 		}
 

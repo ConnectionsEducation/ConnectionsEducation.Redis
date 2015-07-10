@@ -16,38 +16,57 @@ namespace ConnectionsEducation.Redis {
 		/// Encoding
 		/// </summary>
 		private readonly Encoding _encoding;
+
 		/// <summary>
 		/// Host
 		/// </summary>
 		private readonly string _host;
+
 		/// <summary>
 		/// Port
 		/// </summary>
 		private readonly int _port;
+
 		/// <summary>
 		/// Connect is done
 		/// </summary>
 		private readonly ManualResetEventSlim _connectDone = new ManualResetEventSlim(false);
+
+		/// <summary>
+		/// Auth is done
+		/// </summary>
+		private readonly ManualResetEventSlim _authDone = new ManualResetEventSlim(true);
+
 		/// <summary>
 		/// Connect timeout in milliseconds
 		/// </summary>
 		private readonly int _connectTimeout;
+
 		/// <summary>
 		/// Command queue
 		/// </summary>
 		private readonly ConcurrentQueue<Command> _commands;
+
 		/// <summary>
 		/// Cancellation
 		/// </summary>
 		private readonly CancellationTokenSource _cancel;
+
 		/// <summary>
 		/// Client socket
 		/// </summary>
 		private readonly Socket _client;
+
 		/// <summary>
 		/// Connected
 		/// </summary>
 		private bool _connected;
+
+		private string _authPassword;
+
+		private Tuple<bool> _authSent = new Tuple<bool>(false);
+
+		private Tuple<bool> _firstReceived = new Tuple<bool>(false);
 
 		/// <summary>
 		/// Initializes a <see cref="ConnectionClient"/>.
@@ -63,10 +82,9 @@ namespace ConnectionsEducation.Redis {
 			_encoding = encoding ?? Encoding.ASCII;
 			_commands = new ConcurrentQueue<Command>();
 			_cancel = new CancellationTokenSource();
-
 			_client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 		}
-		
+
 		/// <summary>
 		/// Connects
 		/// </summary>
@@ -104,15 +122,30 @@ namespace ConnectionsEducation.Redis {
 				onConnectionError();
 				return;
 			}
+			bool authSent = Interlocked.Exchange(ref _authSent, new Tuple<bool>(true)).Item1;
+			if (!authSent && !_authDone.IsSet)
+				_commands.Enqueue(new Command("AUTH", _authPassword));
 			_connectDone.Set();
 			recvData(client);
 			sendData(client);
 		}
 
 		/// <summary>
+		/// Sets the password to be passed by the AUTH command.
+		/// </summary>
+		/// <param name="password">The password required by the "requirepass" configuration directive on the server.</param>
+		public void setAuthPassword(string password) {
+			if (_connectDone.IsSet)
+				throw new InvalidOperationException("Cannot set AUTH after connected.");
+			_authPassword = password;
+			_authDone.Reset();
+		}
+
+		/// <summary>
 		/// Gets the encoding
 		/// </summary>
-		public Encoding encoding {
+		public Encoding encoding
+		{
 			get { return _encoding; }
 		}
 
@@ -120,6 +153,7 @@ namespace ConnectionsEducation.Redis {
 		/// Receives completed result objects "from the wire"
 		/// </summary>
 		public event EventHandler<ObjectReceivedEventArgs> objectReceived;
+
 		/// <summary>
 		/// Event raised when a connection error occurs.
 		/// </summary>
@@ -139,9 +173,17 @@ namespace ConnectionsEducation.Redis {
 		/// </summary>
 		/// <param name="e">Event arguments</param>
 		protected virtual void onObjectReceived(ObjectReceivedEventArgs e) {
-			EventHandler<ObjectReceivedEventArgs> handler = objectReceived;
-			if (handler != null)
-				handler(this, e);
+			bool first = !Interlocked.Exchange(ref _firstReceived, new Tuple<bool>(true)).Item1;
+			if (first && !_authDone.IsSet) {
+				_authDone.Set();
+				var test = e.Object;
+				return;
+			} else {
+				_authDone.Wait();
+				EventHandler<ObjectReceivedEventArgs> handler = objectReceived;
+				if (handler != null)
+					handler(this, e);
+			}
 		}
 
 		/// <summary>
@@ -149,6 +191,7 @@ namespace ConnectionsEducation.Redis {
 		/// </summary>
 		/// <param name="command">The command.</param>
 		public void send(Command command) {
+			_connectDone.Wait();
 			_commands.Enqueue(command);
 		}
 
@@ -167,6 +210,7 @@ namespace ConnectionsEducation.Redis {
 			if (!_connectDone.Wait(_connectTimeout))
 				onConnectionError();
 			ConnectionState state = new ConnectionState(_encoding);
+			state.setObjectReceivedAction(onObjectReceived);
 			state.workSocket = client;
 			try {
 				client.BeginReceive(state.buffer, 0, ConnectionState.BUFFER_SIZE, 0, new AsyncCallback(recvData_then), state);
@@ -182,9 +226,7 @@ namespace ConnectionsEducation.Redis {
 				onConnectionError();
 			ConnectionState state = (ConnectionState)result.AsyncState;
 			Socket client = state.workSocket;
-			EventHandler<ObjectReceivedEventArgs> handler = new EventHandler<ObjectReceivedEventArgs>(objectReceived);
 			int bytesRead;
-			state.objectReceived += handler;
 			try {
 				bytesRead = client.EndReceive(result);
 			} catch (ObjectDisposedException) {
@@ -193,7 +235,6 @@ namespace ConnectionsEducation.Redis {
 
 			if (bytesRead > 0)
 				updateState(state, bytesRead);
-			state.objectReceived -= handler;
 
 			if (!_disposed && !_cancel.IsCancellationRequested) {
 				try {
@@ -231,7 +272,7 @@ namespace ConnectionsEducation.Redis {
 		private void sendData(Socket client) {
 			if (!_connectDone.Wait(_connectTimeout))
 				onConnectionError();
-			Tuple<Socket,ConcurrentQueue<Command>> sendCommands = new Tuple<Socket,ConcurrentQueue<Command>>(client, _commands);
+			Tuple<Socket, ConcurrentQueue<Command>> sendCommands = new Tuple<Socket, ConcurrentQueue<Command>>(client, _commands);
 			byte[] data = nextData(sendCommands);
 			if (data.Length == 0)
 				Thread.Sleep(0);
@@ -264,7 +305,7 @@ namespace ConnectionsEducation.Redis {
 			if (!_disposed && !_cancel.IsCancellationRequested) {
 				try {
 					client.BeginSend(data, 0, data.Length, 0, new AsyncCallback(sendData_then), sendCommands);
-				} catch (ObjectDisposedException) { }
+				} catch (ObjectDisposedException) {}
 			}
 		}
 
@@ -283,7 +324,7 @@ namespace ConnectionsEducation.Redis {
 		/// </summary>
 		private bool _disposed;
 
-		
+
 		// ReSharper disable once InconsistentNaming
 		/// <summary>
 		/// Disposes the object and any unmanaged resources.
@@ -305,6 +346,5 @@ namespace ConnectionsEducation.Redis {
 		}
 
 		#endregion
-
 	}
 }

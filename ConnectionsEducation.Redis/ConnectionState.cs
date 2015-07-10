@@ -70,19 +70,14 @@ namespace ConnectionsEducation.Redis {
 		/// </summary>
 		public Socket workSocket = null;
 
-		/// <summary>
-		/// Event fired when a complete object is received from bytes.
-		/// </summary>
-		public event EventHandler<ObjectReceivedEventArgs> objectReceived;
+		private Action<ObjectReceivedEventArgs> _onObjectReceived;
 
 		/// <summary>
-		/// Event invocator for <see cref="objectReceived"/>.
+		/// A consumer of this <see cref="ConnectionState"/> instance will observe for objects received from the state.
 		/// </summary>
-		/// <param name="e">The <see cref="ObjectReceivedEventArgs"/> instance containing the event data.</param>
-		protected virtual void onObjectReceived(ObjectReceivedEventArgs e) {
-			EventHandler<ObjectReceivedEventArgs> handler = objectReceived;
-			if (handler != null)
-				handler(this, e);
+		/// <param name="action">The outer scope action to perform. Set to null when finised.</param>
+		internal void setObjectReceivedAction(Action<ObjectReceivedEventArgs> action) {
+			_onObjectReceived = action;
 		}
 
 		/// <summary>
@@ -267,7 +262,7 @@ namespace ConnectionsEducation.Redis {
 					Queue receivedObject = new Queue(receivedData.Count);
 					while (receivedData.Count > 0)
 						receivedObject.Enqueue(receivedData.Dequeue());
-					onObjectReceived(new ObjectReceivedEventArgs(receivedObject));
+					_onObjectReceived(new ObjectReceivedEventArgs(receivedObject));
 				}
 			}
 		}

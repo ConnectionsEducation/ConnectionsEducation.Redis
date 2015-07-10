@@ -9,23 +9,26 @@ namespace ConnectionsEducation.Redis {
 	/// A high-level application interface for Redis functionality.
 	/// </summary>
 	public partial class Redis : IDisposable {
-
 		/// <summary>
 		/// The client
 		/// </summary>
 		private readonly ConnectionClient _client;
+
 		/// <summary>
 		/// The results queue
 		/// </summary>
 		private readonly ConcurrentQueue<AwaitResult> _results = new ConcurrentQueue<AwaitResult>();
+
 		/// <summary>
 		/// The result consumed toggle
 		/// </summary>
 		private readonly ManualResetEventSlim _resultConsumed = new ManualResetEventSlim(true);
+
 		/// <summary>
 		/// The encoding of data
 		/// </summary>
 		private readonly Encoding _encoding;
+
 		/// <summary>
 		/// The synchronization lock
 		/// </summary>
@@ -70,7 +73,8 @@ namespace ConnectionsEducation.Redis {
 			/// Gets the waiter.
 			/// </summary>
 			/// <value>The waiter.</value>
-			public ManualResetEventSlim waiter {
+			public ManualResetEventSlim waiter
+			{
 				get { return _waiter; }
 			}
 
@@ -78,9 +82,11 @@ namespace ConnectionsEducation.Redis {
 			/// Gets or sets the result.
 			/// </summary>
 			/// <value>The result.</value>
-			public object result {
+			public object result
+			{
 				get { return _result; }
-				set {
+				set
+				{
 					Queue queue = _result as Queue;
 					if (queue != null) {
 						Queue valueQueue = value as Queue;
@@ -88,9 +94,8 @@ namespace ConnectionsEducation.Redis {
 							queue.Enqueue(valueQueue.Dequeue());
 						else
 							queue.Enqueue(value);
-					} else {
+					} else
 						_result = value;
-					}
 					_resultsAdded++;
 				}
 			}
@@ -98,7 +103,8 @@ namespace ConnectionsEducation.Redis {
 			/// <summary>
 			/// Returns true if all of the results have been acquired.
 			/// </summary>
-			public bool allResultsAcquired {
+			public bool allResultsAcquired
+			{
 				get { return _resultsAdded == _numberOfResults; }
 			}
 		}
@@ -111,10 +117,12 @@ namespace ConnectionsEducation.Redis {
 			/// The source queue.
 			/// </summary>
 			private readonly Queue _queue;
+
 			/// <summary>
 			/// The current object for the enumerator.
 			/// </summary>
 			private object _current;
+
 			/// <summary>
 			/// Tracks if the state of the object is valid;
 			/// </summary>
@@ -155,8 +163,10 @@ namespace ConnectionsEducation.Redis {
 			/// <summary>
 			/// Gets the current object in the enumeration.
 			/// </summary>
-			public object Current {
-				get {
+			public object Current
+			{
+				get
+				{
 					if (!_validState)
 						throw new InvalidOperationException("The enumeration is not valid for the object's current state.");
 					return _current;
@@ -171,9 +181,12 @@ namespace ConnectionsEducation.Redis {
 		/// <param name="port">The port.</param>
 		/// <param name="connectTimeout">The connect timeout in milliseconds.</param>
 		/// <param name="encoding">The encoding (optional: default ASCII).</param>
-		public Redis(string host = "127.0.0.1", int port = 6379, int connectTimeout = 1000, Encoding encoding = null) {
+		/// <param name="password">The password required by the "requirepass" configuration directive on the server.</param>
+		public Redis(string host = "127.0.0.1", int port = 6379, int connectTimeout = 1000, Encoding encoding = null, string password = null) {
 			_encoding = encoding ?? Encoding.Default;
 			_client = new ConnectionClient(host, port, connectTimeout, this.encoding);
+			if (password != null)
+				_client.setAuthPassword(password);
 			_client.objectReceived += _client_objectReceived;
 			_client.connectionError += _client_connectionError;
 			_client.connect();
@@ -182,7 +195,8 @@ namespace ConnectionsEducation.Redis {
 		/// <summary>
 		/// The encoding of data
 		/// </summary>
-		public Encoding encoding {
+		public Encoding encoding
+		{
 			get { return _encoding; }
 		}
 
@@ -191,7 +205,7 @@ namespace ConnectionsEducation.Redis {
 		/// </summary>
 		/// <param name="sender">The source of the event.</param>
 		/// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
-		void _client_connectionError(object sender, EventArgs e) {
+		private void _client_connectionError(object sender, EventArgs e) {
 			AwaitResult awaitResult;
 			while (_results.TryDequeue(out awaitResult)) {
 				awaitResult.result = new ConnectionError();
@@ -214,7 +228,7 @@ namespace ConnectionsEducation.Redis {
 		/// </summary>
 		/// <param name="sender">The source of the event.</param>
 		/// <param name="e">The <see cref="ObjectReceivedEventArgs"/> instance containing the event data.</param>
-		void _client_objectReceived(object sender, ObjectReceivedEventArgs e) {
+		private void _client_objectReceived(object sender, ObjectReceivedEventArgs e) {
 			if (_awaitResult == null) {
 				if (!_results.TryDequeue(out _awaitResult))
 					_awaitResult = null;
@@ -392,9 +406,8 @@ namespace ConnectionsEducation.Redis {
 			if (_disposed)
 				return;
 
-			if (disposing) {
+			if (disposing)
 				_client.Dispose();
-			}
 
 			_disposed = true;
 		}

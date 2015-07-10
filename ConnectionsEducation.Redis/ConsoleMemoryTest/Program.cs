@@ -20,7 +20,7 @@ namespace ConsoleMemoryTest {
 		private static void runTest(string[] args) {
 			Stopwatch stopwatch = new Stopwatch();
 			const int ITERS = 100;
-			const int BATCH = 1000;
+			const int BATCH = 100;
 			const int OPS_PER_ITERATION = 3 * BATCH + 2;
 			double lastMs = 0.0;
 
@@ -30,7 +30,8 @@ namespace ConsoleMemoryTest {
 				string bar;
 				string host = args.Length > 0 ? args[0] : "127.0.0.1";
 				int port = args.Length > 1 ? Convert.ToInt32(args[1]) : 6379;
-				using (Redis conn = new Redis(host, port)) {
+				string password = args.Length > 2 ? args[2] : null;
+				using (Redis conn = new Redis(host, port, password: password)) {
 					conn.set("bar", "0");
 					for (int i = 0; i < BATCH; ++i) {
 						string guid = Guid.NewGuid().ToString("d");
